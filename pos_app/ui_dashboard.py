@@ -92,6 +92,12 @@ class DashboardWindow(QWidget):
         self.btn_sync.clicked.connect(lambda: self.switch_page(7))
         sidebar_layout.addWidget(self.btn_sync)
         
+        self.btn_settings = QPushButton("⚙️")
+        self.btn_settings.setToolTip("الإعدادات والشركاء")
+        self.btn_settings.setCheckable(True)
+        self.btn_settings.clicked.connect(lambda: self.switch_page(8))
+        sidebar_layout.addWidget(self.btn_settings)
+        
         sidebar_layout.addStretch()
         
         # زر تبديل المظهر (ليلي / مضيء)
@@ -107,7 +113,7 @@ class DashboardWindow(QWidget):
         btn_logout.clicked.connect(self.on_logout)
         sidebar_layout.addWidget(btn_logout)
         
-        self.menu_buttons = [self.btn_pos, self.btn_returns, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_hr, self.btn_reports, self.btn_sync]
+        self.menu_buttons = [self.btn_pos, self.btn_returns, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_hr, self.btn_reports, self.btn_sync, self.btn_settings]
         
         # 2. حاوي الصفحات الرئيسي (مستجيب وقابل للتمدد)
         self.container = QStackedWidget()
@@ -121,6 +127,7 @@ class DashboardWindow(QWidget):
         self.page_hr = HRPage()
         self.page_reports = ReportsPage()
         self.page_sync = SyncPage()
+        self.page_settings = SettingsPage()
         
         self.container.addWidget(self.page_pos)
         self.container.addWidget(self.page_returns)
@@ -130,6 +137,7 @@ class DashboardWindow(QWidget):
         self.container.addWidget(self.page_hr)
         self.container.addWidget(self.page_reports)
         self.container.addWidget(self.page_sync)
+        self.container.addWidget(self.page_settings)
         
         # ترتيب العناصر في Layout الرئيسي
         main_layout.addWidget(self.container, 1) # المحتوى يأخذ المساحة المتبقية
@@ -156,6 +164,8 @@ class DashboardWindow(QWidget):
             self.page_hr.load_employees()
         elif index == 6:
             self.page_reports.load_reports()
+        elif index == 8:
+            self.page_settings.load_settings()
 
     def toggle_theme(self):
         self.dark_mode = not self.dark_mode
@@ -714,7 +724,17 @@ class ReceiptDialog(QDialog):
 
     def generate_receipt_content(self):
         session = get_session()
-        from database import Invoice
+        from database import Invoice, AppSetting
+        
+        # الاستعلام عن معلومات المحل من الإعدادات
+        name_set = session.query(AppSetting).filter_by(key='shop_name').first()
+        addr_set = session.query(AppSetting).filter_by(key='shop_address').first()
+        phone_set = session.query(AppSetting).filter_by(key='shop_phone').first()
+        
+        shop_name = name_set.value if name_set else "سوبر ماركت المنزل السوري"
+        shop_address = addr_set.value if addr_set else "دمشق"
+        shop_phone = phone_set.value if phone_set else "0999999999"
+        
         inv = session.query(Invoice).get(self.invoice_id)
         if not inv:
             session.close()
@@ -722,9 +742,9 @@ class ReceiptDialog(QDialog):
             
         border = "--------------------------------------\n"
         html = f"<div style='text-align: center; font-family: monospace;'>"
-        html += f"<h2>سوبر ماركت المنزل السوري</h2>"
-        html += f"<p>دمشق - كاشير المنزل السوري</p>"
-        html += f"<p>هاتف: 0999999999</p>"
+        html += f"<h2>{shop_name}</h2>"
+        html += f"<p>{shop_address}</p>"
+        html += f"<p>هاتف: {shop_phone}</p>"
         html += f"<p><b>رقم الفاتورة: #{inv.id}</b></p>"
         html += f"<p>التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</p>"
         html += f"</div>"
@@ -2974,3 +2994,319 @@ class ReturnsPage(QWidget):
         self.return_items.clear()
         self.update_table()
         self.barcode_input.clear()
+
+
+# ==================== SETTINGS & PARTNERS PAGE ====================
+class SettingsPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        header = QLabel("⚙️ الإعدادات وإدارة الشركاء والمسحوبات")
+        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
+        layout.addWidget(header)
+        
+        self.tabs = QTabWidget()
+        self.tab_info = QWidget()
+        self.tab_partners = QWidget()
+        self.tab_withdrawals = QWidget()
+        
+        self.tabs.addTab(self.tab_info, "🏡 معلومات وإعدادات المحل")
+        self.tabs.addTab(self.tab_partners, "👥 إدارة شركاء المحل")
+        self.tabs.addTab(self.tab_withdrawals, "💸 تسجيل مسحوب نقدية للشركاء")
+        
+        self.setup_info_tab()
+        self.setup_partners_tab()
+        self.setup_withdrawals_tab()
+        
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
+        
+        self.tabs.currentChanged.connect(self.on_tab_changed)
+        self.load_settings()
+
+    def on_tab_changed(self, index):
+        if index == 0:
+            self.load_settings()
+        elif index == 1:
+            self.load_partners()
+        elif index == 2:
+            self.load_partners_combo()
+            self.load_withdrawals()
+
+    # --- التبويب الأول: معلومات المحل ---
+    def setup_info_tab(self):
+        layout = QFormLayout()
+        layout.setSpacing(15)
+        
+        self.input_shop_name = QLineEdit()
+        self.input_shop_name.setPlaceholderText("اسم السوبر ماركت...")
+        self.input_shop_name.setMinimumHeight(35)
+        
+        self.input_shop_address = QLineEdit()
+        self.input_shop_address.setPlaceholderText("عنوان الفرع...")
+        self.input_shop_address.setMinimumHeight(35)
+        
+        self.input_shop_phone = QLineEdit()
+        self.input_shop_phone.setPlaceholderText("رقم الهاتف للتواصل...")
+        self.input_shop_phone.setMinimumHeight(35)
+        
+        btn_save = QPushButton("حفظ إعدادات المتجر 💾")
+        btn_save.clicked.connect(self.save_settings)
+        btn_save.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold; font-size: 14px; padding: 10px;")
+        
+        layout.addRow("اسم المحل (في الريسيت):", self.input_shop_name)
+        layout.addRow("عنوان المحل:", self.input_shop_address)
+        layout.addRow("رقم الهاتف:", self.input_shop_phone)
+        layout.addRow("", btn_save)
+        
+        self.tab_info.setLayout(layout)
+
+    def load_settings(self):
+        session = get_session()
+        from database import AppSetting
+        
+        name = session.query(AppSetting).filter_by(key='shop_name').first()
+        addr = session.query(AppSetting).filter_by(key='shop_address').first()
+        phone = session.query(AppSetting).filter_by(key='shop_phone').first()
+        
+        if name: self.input_shop_name.setText(name.value)
+        if addr: self.input_shop_address.setText(addr.value)
+        if phone: self.input_shop_phone.setText(phone.value)
+        session.close()
+
+    def save_settings(self):
+        name = self.input_shop_name.text().strip()
+        addr = self.input_shop_address.text().strip()
+        phone = self.input_shop_phone.text().strip()
+        
+        if not name:
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم المحل")
+            return
+            
+        session = get_session()
+        from database import AppSetting
+        
+        n_set = session.query(AppSetting).filter_by(key='shop_name').first()
+        if not n_set:
+            n_set = AppSetting(key='shop_name', value=name)
+            session.add(n_set)
+        else:
+            n_set.value = name
+            
+        a_set = session.query(AppSetting).filter_by(key='shop_address').first()
+        if not a_set:
+            a_set = AppSetting(key='shop_address', value=addr)
+            session.add(a_set)
+        else:
+            a_set.value = addr
+            
+        p_set = session.query(AppSetting).filter_by(key='shop_phone').first()
+        if not p_set:
+            p_set = AppSetting(key='shop_phone', value=phone)
+            session.add(p_set)
+        else:
+            p_set.value = phone
+            
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "تم الحفظ", "تم حفظ معلومات المحل بنجاح وتحديث الفواتير والريسيت!")
+
+    # --- التبويب الثاني: إدارة الشركاء ---
+    def setup_partners_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.input_partner_name = QLineEdit()
+        self.input_partner_name.setPlaceholderText("اسم الشريك الجديد")
+        
+        self.input_partner_share = QDoubleSpinBox()
+        self.input_partner_share.setMaximum(100.0)
+        self.input_partner_share.setSuffix(" %")
+        self.input_partner_share.setPrefix("نسبة الشراكة: ")
+        
+        btn_add = QPushButton("حفظ الشريك")
+        btn_add.clicked.connect(self.save_partner)
+        btn_add.setStyleSheet("background-color: #2c3e50;")
+        
+        form_layout.addWidget(self.input_partner_name)
+        form_layout.addWidget(self.input_partner_share)
+        form_layout.addWidget(btn_add)
+        layout.addWidget(form_widget)
+        
+        self.table_partners = QTableWidget()
+        self.table_partners.setColumnCount(4)
+        self.table_partners.setHorizontalHeaderLabels(["المعرف", "الاسم", "النسبة مئوية", "إجمالي المسحوبات"])
+        self.table_partners.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_partners.doubleClicked.connect(self.load_row_to_partner_form)
+        layout.addWidget(self.table_partners)
+        
+        buttons_layout = QHBoxLayout()
+        btn_delete = QPushButton("❌ حذف الشريك المحدد")
+        btn_delete.clicked.connect(self.delete_partner)
+        btn_delete.setObjectName("dangerButton")
+        buttons_layout.addWidget(btn_delete)
+        layout.addLayout(buttons_layout)
+        
+        self.tab_partners.setLayout(layout)
+        self.load_partners()
+
+    def load_partners(self):
+        self.table_partners.setRowCount(0)
+        session = get_session()
+        from database import Partner
+        partners = session.query(Partner).all()
+        
+        for p in partners:
+            row = self.table_partners.rowCount()
+            self.table_partners.insertRow(row)
+            self.table_partners.setItem(row, 0, QTableWidgetItem(str(p.id)))
+            self.table_partners.setItem(row, 1, QTableWidgetItem(p.name))
+            self.table_partners.setItem(row, 2, QTableWidgetItem(f"{p.share_percentage:.1f} %"))
+            
+            # حساب إجمالي المسحوبات للشريك
+            tot_w = sum(w.amount for w in p.withdrawals)
+            self.table_partners.setItem(row, 3, QTableWidgetItem(f"{tot_w:.2f} ل.س"))
+            
+        session.close()
+
+    def save_partner(self):
+        name = self.input_partner_name.text().strip()
+        share = self.input_partner_share.value()
+        
+        if not name:
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم الشريك")
+            return
+            
+        session = get_session()
+        from database import Partner
+        p = session.query(Partner).filter_by(name=name).first()
+        if p:
+            p.share_percentage = share
+        else:
+            p = Partner(name=name, share_percentage=share)
+            session.add(p)
+            
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "تم الحفظ", "تم حفظ بيانات الشريك بنجاح!")
+        self.input_partner_name.clear()
+        self.input_partner_share.setValue(0.0)
+        self.load_partners()
+
+    def load_row_to_partner_form(self):
+        row = self.table_partners.currentRow()
+        if row >= 0:
+            self.input_partner_name.setText(self.table_partners.item(row, 1).text())
+            share_txt = self.table_partners.item(row, 2).text().replace(" %", "")
+            self.input_partner_share.setValue(float(share_txt))
+
+    def delete_partner(self):
+        row = self.table_partners.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "تنبيه", "الرجاء تحديد شريك لحذفه")
+            return
+            
+        p_id = int(self.table_partners.item(row, 0).text())
+        p_name = self.table_partners.item(row, 1).text()
+        
+        reply = QMessageBox.question(self, "تأكيد الحذف", f"هل أنت متأكد من حذف الشريك: {p_name}؟",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            session = get_session()
+            from database import Partner
+            p = session.query(Partner).get(p_id)
+            if p:
+                session.delete(p)
+                session.commit()
+            session.close()
+            QMessageBox.information(self, "تم الحذف", "تم حذف الشريك بنجاح!")
+            self.load_partners()
+
+    # --- التبويب الثالث: مسحوبات الشركاء ---
+    def setup_withdrawals_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.combo_with_partners = QComboBox()
+        self.load_partners_combo()
+        
+        self.input_with_amount = QDoubleSpinBox()
+        self.input_with_amount.setMaximum(999999.0)
+        self.input_with_amount.setPrefix("المبلغ المسحوب: ")
+        
+        self.input_with_note = QLineEdit()
+        self.input_with_note.setPlaceholderText("ملاحظات / سبب السحب من الصندوق...")
+        
+        btn_save = QPushButton("تسجيل مسحوب نقدية 💸")
+        btn_save.clicked.connect(self.save_withdrawal)
+        btn_save.setStyleSheet("background-color: #ef4444; color: white; font-weight: bold;")
+        
+        form_layout.addWidget(self.combo_with_partners)
+        form_layout.addWidget(self.input_with_amount)
+        form_layout.addWidget(self.input_with_note)
+        form_layout.addWidget(btn_save)
+        layout.addWidget(form_widget)
+        
+        self.table_withdrawals = QTableWidget()
+        self.table_withdrawals.setColumnCount(4)
+        self.table_withdrawals.setHorizontalHeaderLabels(["الشريك", "المبلغ", "التاريخ والوقت", "الملاحظات"])
+        self.table_withdrawals.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_withdrawals)
+        
+        self.tab_withdrawals.setLayout(layout)
+        self.load_withdrawals()
+
+    def load_partners_combo(self):
+        self.combo_with_partners.clear()
+        session = get_session()
+        from database import Partner
+        partners = session.query(Partner).all()
+        for p in partners:
+            self.combo_with_partners.addItem(p.name, p.id)
+        session.close()
+
+    def load_withdrawals(self):
+        self.table_withdrawals.setRowCount(0)
+        session = get_session()
+        from database import PartnerWithdrawal
+        withdrawals = session.query(PartnerWithdrawal).order_by(PartnerWithdrawal.date.desc()).all()
+        
+        for w in withdrawals:
+            row = self.table_withdrawals.rowCount()
+            self.table_withdrawals.insertRow(row)
+            self.table_withdrawals.setItem(row, 0, QTableWidgetItem(w.partner.name if w.partner else "غير معروف"))
+            self.table_withdrawals.setItem(row, 1, QTableWidgetItem(f"{w.amount:.2f}"))
+            self.table_withdrawals.setItem(row, 2, QTableWidgetItem(w.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_withdrawals.setItem(row, 3, QTableWidgetItem(w.note if w.note else ""))
+            
+        session.close()
+
+    def save_withdrawal(self):
+        p_id = self.combo_with_partners.currentData()
+        amount = self.input_with_amount.value()
+        note = self.input_with_note.text().strip()
+        
+        if not p_id or amount <= 0:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار شريك وتحديد مبلغ صحيح")
+            return
+            
+        session = get_session()
+        from database import PartnerWithdrawal
+        w = PartnerWithdrawal(partner_id=p_id, amount=amount, note=note)
+        session.add(w)
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "نجاح", "تم تسجيل المسحوب النقدي للشريك بنجاح من الخزينة!")
+        self.input_with_amount.setValue(0.0)
+        self.input_with_note.clear()
+        self.load_withdrawals()
