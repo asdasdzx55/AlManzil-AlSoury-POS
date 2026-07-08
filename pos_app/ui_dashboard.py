@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QStackedWidget, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QLineEdit, 
-                             QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QSpinBox)
+                             QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QSpinBox,
+                             QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence
 from database import get_session, Product, Category, Supplier, User
 
 class DashboardWindow(QWidget):
@@ -143,63 +144,232 @@ class DashboardWindow(QWidget):
             self.page_reports.load_reports()
 
 
-# ==================== PAGE 1: POS / CASHIER ====================
-class POSPage(QWidget):
-    def __init__(self, user):
-        super().__init__()
-        self.user = user
-        self.cart = {} # {barcode: {name, price, qty}}
+# ==================== DIALOGS FOR POS ====================
+class ProductSearchDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("بحث عن المنتجات (F1 للبحث)")
+        self.resize(600, 450)
+        self.selected_barcode = None
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
         
-        header = QLabel("🛒 نقطة البيع (الكاشير)")
-        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
-        layout.addWidget(header)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("اكتب اسم المنتج أو الباركود للبحث...")
+        self.search_input.textChanged.connect(self.search_products)
+        layout.addWidget(self.search_input)
         
-        # Barcode input and Quick Search
-        search_layout = QHBoxLayout()
-        self.barcode_input = QLineEdit()
-        self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا...")
-        self.barcode_input.returnPressed.connect(self.add_by_barcode)
-        
-        btn_add = QPushButton("إضافة للفاتورة")
-        btn_add.clicked.connect(self.add_by_barcode)
-        
-        search_layout.addWidget(self.barcode_input, 4)
-        search_layout.addWidget(btn_add, 1)
-        layout.addLayout(search_layout)
-        
-        # Cart Table
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "الكمية", "الإجمالي"])
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "النوع"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.doubleClicked.connect(self.accept_selection)
         layout.addWidget(self.table)
         
-        # Total Summary & Checkout Button
-        summary_layout = QHBoxLayout()
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept_selection)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
         
+        self.setLayout(layout)
+        self.search_products()
+        self.search_input.setFocus()
+
+    def search_products(self):
+        self.table.setRowCount(0)
+        query = self.search_input.text().strip()
+        
+        session = get_session()
+        products = session.query(Product).filter(
+            (Product.name.like(f"%{query}%")) | (Product.barcode.like(f"%{query}%"))
+        ).all()
+        session.close()
+        
+        for p in products:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(p.barcode))
+            self.table.setItem(row, 1, QTableWidgetItem(p.name))
+            self.table.setItem(row, 2, QTableWidgetItem(f"{p.price:.2f}"))
+            self.table.setItem(row, 3, QTableWidgetItem("بالوزن" if p.is_weighted else "بالقطعة"))
+
+    def accept_selection(self):
+        selected_row = self.table.currentRow()
+        if selected_row >= 0:
+            self.selected_barcode = self.table.item(selected_row, 0).text()
+            self.accept()
+        else:
+            self.reject()
+
+
+class RecallDialog(QDialog):
+    def __init__(self, invoices, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("استدعاء فاتورة معلقة")
+        self.resize(550, 350)
+        self.invoices = invoices
+        self.selected_invoice = None
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        self.list_widget = QListWidget()
+        for i, inv in enumerate(self.invoices):
+            cust_name = inv['customer_name'] if inv['customer_name'] else "عميل سفري"
+            desc = f"فاتورة معلقة #{i+1} | العميل: {cust_name} | الإجمالي: {inv['total']:.2f} ل.س | الأصناف: {len(inv['cart'])}"
+            item = QListWidgetItem(desc)
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            self.list_widget.addItem(item)
+            
+        self.list_widget.doubleClicked.connect(self.accept_selection)
+        layout.addWidget(self.list_widget)
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept_selection)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+    def accept_selection(self):
+        selected = self.list_widget.selectedItems()
+        if selected:
+            idx = selected[0].data(Qt.ItemDataRole.UserRole)
+            self.selected_invoice = self.invoices[idx]
+            self.invoices.pop(idx) # إزالة من قائمة المعلقات بعد استدعائها
+            self.accept()
+        else:
+            self.reject()
+
+
+# ==================== PAGE 1: POS / CASHIER ====================
+class POSPage(QWidget):
+    def __init__(self, user):
+        super().__init__()
+        self.user = user
+        self.cart = {} # {barcode: {id, name, price, qty, is_weighted}}
+        self.held_invoices = []
+        self.init_ui()
+        self.setup_shortcuts()
+
+    def init_ui(self):
+        # تقسيم الشاشة: يمين (إجمالي وبيانات عميل)، يسار (جدول المشتريات والباركود)
+        main_layout = QHBoxLayout()
+        
+        # 1. لوحة المشتريات والباركود (اليسار - تأخذ مساحة أكبر)
+        left_panel = QVBoxLayout()
+        
+        header = QLabel("🛒 نقطة البيع (الكاشير) - سوبر ماركت المنزل السوري")
+        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;")
+        left_panel.addWidget(header)
+        
+        search_layout = QHBoxLayout()
+        self.barcode_input = QLineEdit()
+        self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا... (F1 للبحث المتقدم)")
+        self.barcode_input.returnPressed.connect(self.add_by_barcode)
+        
+        btn_search = QPushButton("🔍 بحث متقدم")
+        btn_search.setStyleSheet("background-color: #34495e;")
+        btn_search.clicked.connect(self.open_search_dialog)
+        
+        search_layout.addWidget(self.barcode_input, 4)
+        search_layout.addWidget(btn_search, 1)
+        left_panel.addLayout(search_layout)
+        
+        # جدول المنتجات بالسلة
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "الكمية / الوزن", "الإجمالي"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.cellChanged.connect(self.on_cell_changed)
+        left_panel.addWidget(self.table)
+        
+        # 2. لوحة الإعدادات والملخص (اليمين - أصغر)
+        right_panel = QVBoxLayout()
+        right_panel.setContentsMargins(10, 10, 10, 10)
+        
+        # بيانات العميل (لو أوردر)
+        cust_group = QGroupBox("بيانات الأوردر / التوصيل")
+        cust_layout = QFormLayout(cust_group)
+        self.cust_name = QLineEdit()
+        self.cust_name.setPlaceholderText("اسم العميل")
+        self.cust_phone = QLineEdit()
+        self.cust_phone.setPlaceholderText("رقم الهاتف")
+        self.cust_address = QLineEdit()
+        self.cust_address.setPlaceholderText("العنوان للتوصيل")
+        cust_layout.addRow("الاسم:", self.cust_name)
+        cust_layout.addRow("الهاتف:", self.cust_phone)
+        cust_layout.addRow("العنوان:", self.cust_address)
+        right_panel.addWidget(cust_group)
+        
+        # طريقة الدفع
+        payment_group = QGroupBox("تفاصيل الدفع")
+        payment_layout = QFormLayout(payment_group)
+        self.payment_method = QComboBox()
+        self.payment_method.addItems(["نقدي (Cash)", "فيزا (Visa)", "إنستا باي (InstaPay)", "فودافون كاش"])
+        payment_layout.addRow("طريقة الدفع:", self.payment_method)
+        right_panel.addWidget(payment_group)
+        
+        # الإجمالي العام
         self.total_label = QLabel("الإجمالي: 0.00 ل.س")
-        self.total_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #27ae60;")
+        self.total_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #27ae60; margin: 15px 0;")
+        self.total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_panel.addWidget(self.total_label)
         
-        btn_pay = QPushButton("💳 دفع وإنهاء الفاتورة")
-        btn_pay.setStyleSheet("background-color: #27ae60; font-size: 16px; padding: 12px 25px;")
+        # أزرار الإجراءات
+        btn_pay = QPushButton("💳 دفع وإنهاء (F5)")
+        btn_pay.setStyleSheet("background-color: #2ecc71; font-size: 16px; padding: 12px; font-weight: bold;")
         btn_pay.clicked.connect(self.checkout)
+        right_panel.addWidget(btn_pay)
+        
+        btn_hold = QPushButton("⏸️ تعليق الفاتورة (F3)")
+        btn_hold.setStyleSheet("background-color: #e67e22; font-size: 14px; padding: 8px;")
+        btn_hold.clicked.connect(self.hold_invoice)
+        right_panel.addWidget(btn_hold)
+        
+        btn_recall = QPushButton("▶️ استدعاء المعلقات (F4)")
+        btn_recall.setStyleSheet("background-color: #3498db; font-size: 14px; padding: 8px;")
+        btn_recall.clicked.connect(self.recall_invoice)
+        right_panel.addWidget(btn_recall)
         
         btn_clear = QPushButton("🗑️ تفريغ السلة")
         btn_clear.setObjectName("dangerButton")
-        btn_clear.setStyleSheet("background-color: #e74c3c; font-size: 16px; padding: 12px 25px;")
+        btn_clear.setStyleSheet("background-color: #e74c3c; font-size: 14px; padding: 8px;")
         btn_clear.clicked.connect(self.clear_cart)
+        right_panel.addWidget(btn_clear)
         
-        summary_layout.addWidget(self.total_label)
-        summary_layout.addStretch()
-        summary_layout.addWidget(btn_clear)
-        summary_layout.addWidget(btn_pay)
+        right_panel.addStretch()
         
-        layout.addLayout(summary_layout)
-        self.setLayout(layout)
+        # تجميع اللوحات
+        main_layout.addLayout(left_panel, 3)
+        main_layout.addLayout(right_panel, 1)
+        self.setLayout(main_layout)
+
+    def setup_shortcuts(self):
+        # F1: التركيز على حقل البحث
+        self.sh_focus = QShortcut(QKeySequence("F1"), self)
+        self.sh_focus.activated.connect(self.barcode_input.setFocus)
+        
+        # F3: تعليق الفاتورة
+        self.sh_hold = QShortcut(QKeySequence("F3"), self)
+        self.sh_hold.activated.connect(self.hold_invoice)
+        
+        # F4: استدعاء الفاتورة
+        self.sh_recall = QShortcut(QKeySequence("F4"), self)
+        self.sh_recall.activated.connect(self.recall_invoice)
+        
+        # F5: دفع وإنهاء الفاتورة
+        self.sh_pay = QShortcut(QKeySequence("F5"), self)
+        self.sh_pay.activated.connect(self.checkout)
+
+    def open_search_dialog(self):
+        dialog = ProductSearchDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if dialog.selected_barcode:
+                self.barcode_input.setText(dialog.selected_barcode)
+                self.add_by_barcode()
 
     def add_by_barcode(self):
         barcode = self.barcode_input.text().strip()
@@ -207,18 +377,19 @@ class POSPage(QWidget):
             return
             
         session = get_session()
-        # Search by barcode or name
-        product = session.query(Product).filter((Product.barcode == barcode) | (Product.name.like(f"%{barcode}%"))).first()
+        product = session.query(Product).filter((Product.barcode == barcode) | (Product.name == barcode)).first()
         session.close()
         
         if product:
             if product.quantity <= 0:
-                QMessageBox.warning(self, "تنبيه", "هذا المنتج غير متوفر في المخزن (الكمية 0)")
+                QMessageBox.warning(self, "تنبيه", "هذا المنتج غير متوفر في المخزن")
                 return
                 
             if product.barcode in self.cart:
-                if self.cart[product.barcode]['qty'] < product.quantity:
-                    self.cart[product.barcode]['qty'] += 1
+                # للمنتجات العادية نزيد قطعة، للمنتجات الموزونة نزيد 1 جرام (0.001) أو كيلو
+                step = 0.1 if product.is_weighted else 1.0
+                if self.cart[product.barcode]['qty'] + step <= product.quantity:
+                    self.cart[product.barcode]['qty'] += step
                 else:
                     QMessageBox.warning(self, "تنبيه", "الكمية المطلوبة تتجاوز المتاح في المخزن")
             else:
@@ -226,15 +397,17 @@ class POSPage(QWidget):
                     'id': product.id,
                     'name': product.name,
                     'price': product.price,
-                    'qty': 1
+                    'qty': 1.0 if product.is_weighted else 1.0,
+                    'is_weighted': product.is_weighted
                 }
             self.barcode_input.clear()
             self.update_cart_table()
         else:
-            QMessageBox.critical(self, "خطأ", "المنتج غير موجود في قاعدة البيانات")
-            self.barcode_input.clear()
+            # إذا لم يجد بالباركود نبحث بحث جزئي بالاسم
+            self.open_search_dialog()
 
     def update_cart_table(self):
+        self.table.blockSignals(True)
         self.table.setRowCount(0)
         total = 0.0
         for barcode, item in self.cart.items():
@@ -244,13 +417,109 @@ class POSPage(QWidget):
             subtotal = item['price'] * item['qty']
             total += subtotal
             
-            self.table.setItem(row, 0, QTableWidgetItem(barcode))
-            self.table.setItem(row, 1, QTableWidgetItem(item['name']))
-            self.table.setItem(row, 2, QTableWidgetItem(f"{item['price']:.2f}"))
-            self.table.setItem(row, 3, QTableWidgetItem(str(item['qty'])))
-            self.table.setItem(row, 4, QTableWidgetItem(f"{subtotal:.2f}"))
+            b_item = QTableWidgetItem(barcode)
+            b_item.setFlags(b_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            n_item = QTableWidgetItem(item['name'])
+            n_item.setFlags(n_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            p_item = QTableWidgetItem(f"{item['price']:.2f}") # قابل للتعديل
+            
+            # عرض الكمية ككسر إذا كان المنتج موزوناً، أو كعدد صحيح
+            qty_str = f"{item['qty']:.3f}" if item['is_weighted'] else str(int(item['qty']))
+            q_item = QTableWidgetItem(qty_str) # قابل للتعديل
+            
+            s_item = QTableWidgetItem(f"{subtotal:.2f}")
+            s_item.setFlags(s_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            self.table.setItem(row, 0, b_item)
+            self.table.setItem(row, 1, n_item)
+            self.table.setItem(row, 2, p_item)
+            self.table.setItem(row, 3, q_item)
+            self.table.setItem(row, 4, s_item)
             
         self.total_label.setText(f"الإجمالي: {total:.2f} ل.س")
+        self.table.blockSignals(False)
+
+    def on_cell_changed(self, row, column):
+        self.table.blockSignals(True)
+        barcode = self.table.item(row, 0).text()
+        item = self.cart.get(barcode)
+        
+        if not item:
+            self.table.blockSignals(False)
+            return
+            
+        session = get_session()
+        db_product = session.query(Product).filter_by(barcode=barcode).first()
+        session.close()
+        
+        if column == 2: # تعديل السعر
+            try:
+                new_price = float(self.table.item(row, column).text())
+                if db_product and new_price < db_product.price:
+                    QMessageBox.warning(self, "تنبيه", f"لا يمكن بيع المنتج بسعر أقل من سعر البيع الأساسي ({db_product.price:.2f} ل.س)")
+                    new_price = db_product.price
+                item['price'] = new_price
+            except ValueError:
+                pass
+                
+        elif column == 3: # تعديل الكمية / الوزن (جرامات)
+            try:
+                new_qty = float(self.table.item(row, column).text())
+                if db_product:
+                    if not db_product.is_weighted:
+                        new_qty = int(new_qty)
+                    if new_qty > db_product.quantity:
+                        QMessageBox.warning(self, "تنبيه", f"الكمية المتاحة في المخزن فقط: {db_product.quantity}")
+                        new_qty = db_product.quantity
+                    if new_qty <= 0:
+                        new_qty = 1
+                item['qty'] = new_qty
+            except ValueError:
+                pass
+                
+        self.table.blockSignals(False)
+        self.update_cart_table()
+
+    def update_total_amount(self):
+        total = sum(item['price'] * item['qty'] for item in self.cart.values())
+        self.total_label.setText(f"الإجمالي: {total:.2f} ل.س")
+
+    def hold_invoice(self):
+        if not self.cart:
+            return
+        total = sum(item['price'] * item['qty'] for item in self.cart.values())
+        invoice = {
+            'cart': dict(self.cart),
+            'customer_name': self.cust_name.text().strip(),
+            'customer_phone': self.cust_phone.text().strip(),
+            'customer_address': self.cust_address.text().strip(),
+            'payment_method': self.payment_method.currentText(),
+            'total': total
+        }
+        self.held_invoices.append(invoice)
+        QMessageBox.information(self, "تم تعليق الفاتورة", f"تم حفظ الفاتورة مؤقتاً بنجاح. عدد الفواتير المعلقة: {len(self.held_invoices)}")
+        self.clear_cart()
+        self.cust_name.clear()
+        self.cust_phone.clear()
+        self.cust_address.clear()
+
+    def recall_invoice(self):
+        if not self.held_invoices:
+            QMessageBox.information(self, "تنبيه", "لا توجد فواتير معلقة حالياً.")
+            return
+        dialog = RecallDialog(self.held_invoices, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            inv = dialog.selected_invoice
+            self.cart = inv['cart']
+            self.cust_name.setText(inv['customer_name'])
+            self.cust_phone.setText(inv['customer_phone'])
+            self.cust_address.setText(inv['customer_address'])
+            idx = self.payment_method.findText(inv['payment_method'])
+            if idx >= 0:
+                self.payment_method.setCurrentIndex(idx)
+            self.update_cart_table()
 
     def clear_cart(self):
         self.cart.clear()
@@ -263,13 +532,14 @@ class POSPage(QWidget):
             
         session = get_session()
         try:
-            # Update product stocks
+            # تحديث مخزن البضائع
             for barcode, item in self.cart.items():
                 prod = session.query(Product).filter_by(barcode=barcode).first()
                 if prod:
                     prod.quantity -= item['qty']
             session.commit()
-            QMessageBox.information(self, "نجاح العملية", "تم إصدار الفاتورة وحفظ البيع بنجاح!")
+            
+            QMessageBox.information(self, "تمت العملية", f"تم تسجيل الفاتورة بنجاح ودفعها عن طريق ({self.payment_method.currentText()})")
             self.clear_cart()
         except Exception as e:
             session.rollback()
@@ -291,7 +561,7 @@ class InventoryPage(QWidget):
         header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
         layout.addWidget(header)
         
-        # Product Entry Form / Add Layout
+        # نموذج إدخال المنتجات
         form_widget = QWidget()
         form_layout = QHBoxLayout(form_widget)
         
@@ -299,12 +569,16 @@ class InventoryPage(QWidget):
         self.input_barcode.setPlaceholderText("الباركود")
         self.input_name = QLineEdit()
         self.input_name.setPlaceholderText("اسم الصنف")
+        
         self.input_price = QDoubleSpinBox()
         self.input_price.setMaximum(999999.0)
         self.input_price.setPrefix("السعر: ")
-        self.input_qty = QSpinBox()
-        self.input_qty.setMaximum(99999)
+        
+        self.input_qty = QDoubleSpinBox() # تغييرها لتدعم الكسور في الكمية (الوزن)
+        self.input_qty.setMaximum(99999.0)
         self.input_qty.setPrefix("الكمية: ")
+        
+        self.check_weighted = QCheckBox("منتج بالوزن / جرامات")
         
         btn_save = QPushButton("إضافة/تعديل صنف")
         btn_save.clicked.connect(self.save_product)
@@ -314,14 +588,15 @@ class InventoryPage(QWidget):
         form_layout.addWidget(self.input_name)
         form_layout.addWidget(self.input_price)
         form_layout.addWidget(self.input_qty)
+        form_layout.addWidget(self.check_weighted)
         form_layout.addWidget(btn_save)
         
         layout.addWidget(form_widget)
         
-        # Product List Table
+        # جدول عرض البضائع المتاحة
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "الكمية المتاحة"])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "الكمية المتاحة", "نوع البيع"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.doubleClicked.connect(self.load_row_to_form)
         layout.addWidget(self.table)
@@ -341,27 +616,31 @@ class InventoryPage(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(prod.barcode))
             self.table.setItem(row, 1, QTableWidgetItem(prod.name))
             self.table.setItem(row, 2, QTableWidgetItem(f"{prod.price:.2f}"))
-            self.table.setItem(row, 3, QTableWidgetItem(str(prod.quantity)))
+            
+            qty_str = f"{prod.quantity:.3f}" if prod.is_weighted else str(int(prod.quantity))
+            self.table.setItem(row, 3, QTableWidgetItem(qty_str))
+            self.table.setItem(row, 4, QTableWidgetItem("بالوزن" if prod.is_weighted else "بالقطعة"))
 
     def save_product(self):
         barcode = self.input_barcode.text().strip()
         name = self.input_name.text().strip()
         price = self.input_price.value()
         qty = self.input_qty.value()
+        is_weighted = self.check_weighted.isChecked()
         
         if not barcode or not name:
             QMessageBox.warning(self, "تنبيه", "الرجاء تعبئة حقل الباركود والاسم")
             return
             
         session = get_session()
-        # Check if product exists to update it, else create
         prod = session.query(Product).filter_by(barcode=barcode).first()
         if prod:
             prod.name = name
             prod.price = price
             prod.quantity = qty
+            prod.is_weighted = is_weighted
         else:
-            prod = Product(barcode=barcode, name=name, price=price, quantity=qty)
+            prod = Product(barcode=barcode, name=name, price=price, quantity=qty, is_weighted=is_weighted)
             session.add(prod)
             
         session.commit()
@@ -372,6 +651,7 @@ class InventoryPage(QWidget):
         self.input_name.clear()
         self.input_price.setValue(0)
         self.input_qty.setValue(0)
+        self.check_weighted.setChecked(False)
         self.load_products()
 
     def load_row_to_form(self):
@@ -380,7 +660,8 @@ class InventoryPage(QWidget):
             self.input_barcode.setText(self.table.item(row, 0).text())
             self.input_name.setText(self.table.item(row, 1).text())
             self.input_price.setValue(float(self.table.item(row, 2).text()))
-            self.input_qty.setValue(int(self.table.item(row, 3).text()))
+            self.input_qty.setValue(float(self.table.item(row, 3).text()))
+            self.check_weighted.setChecked(self.table.item(row, 4).text() == "بالوزن")
 
 
 # ==================== PAGE 3: SUPPLIERS ====================

@@ -23,7 +23,8 @@ class Product(Base):
     barcode = Column(String(50), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     price = Column(Float, nullable=False)
-    quantity = Column(Integer, default=0)
+    quantity = Column(Float, default=0.0) # يدعم الكسور للوزن
+    is_weighted = Column(Boolean, default=False) # هل المنتج يباع بالوزن؟
     category_id = Column(Integer, ForeignKey('categories.id'))
     category = relationship("Category", back_populates="products")
 
@@ -35,7 +36,16 @@ class Supplier(Base):
     balance = Column(Float, default=0.0)
 
 # Setup SQLite DB
+from sqlalchemy import text
 engine = create_engine('sqlite:///supermarket.db', echo=False)
+
+try:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT is_weighted FROM products LIMIT 1"))
+except Exception:
+    # في حال لم يكن الحقل موجوداً، نقوم بحذف الجداول وإعادة إنشائها بالبنية الجديدة
+    Base.metadata.drop_all(engine)
+
 Base.metadata.create_all(engine)
 
 SessionLocal = sessionmaker(bind=engine)
