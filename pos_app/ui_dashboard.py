@@ -2,7 +2,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QStackedWidget, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QLineEdit, 
                              QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QSpinBox,
-                             QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox)
+                             QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
+                             QTabWidget)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence
 from database import get_session, Product, Category, Supplier, User
@@ -680,25 +681,61 @@ class SuppliersPage(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
-        header = QLabel("👥 إدارة الموردين")
+        header = QLabel("👥 نظام إدارة الموردين المتكامل")
         header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
         layout.addWidget(header)
         
-        # Form
+        # إنشاء نظام التبويبات
+        self.tabs = QTabWidget()
+        
+        # تجهيز صفحات التبويبات
+        self.tab_manage = QWidget()
+        self.tab_payments = QWidget()
+        self.tab_smart_orders = QWidget()
+        
+        self.tabs.addTab(self.tab_manage, "👤 إضافة وإدارة الموردين")
+        self.tabs.addTab(self.tab_payments, "💰 دفعات وحسابات الموردين")
+        self.tabs.addTab(self.tab_smart_orders, "🤖 مولد الطلبات الذكي (واتساب)")
+        
+        # إعداد التبويبات بالتفصيل
+        self.setup_manage_tab()
+        self.setup_payments_tab()
+        self.setup_smart_orders_tab()
+        
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
+        
+        # ربط حدث تغيير التبويب لتحديث البيانات
+        self.tabs.currentChanged.connect(self.on_tab_changed)
+
+    def on_tab_changed(self, index):
+        if index == 0:
+            self.load_suppliers()
+        elif index == 1:
+            self.load_suppliers_combo()
+            self.load_transactions()
+        elif index == 2:
+            self.load_suppliers_order_combo()
+
+    # --- التبويب الأول: إضافة وإدارة الموردين ---
+    def setup_manage_tab(self):
+        layout = QVBoxLayout()
+        
         form_widget = QWidget()
         form_layout = QHBoxLayout(form_widget)
         
         self.input_name = QLineEdit()
-        self.input_name.setPlaceholderText("اسم المورد")
+        self.input_name.setPlaceholderText("اسم المورد الجديد")
         self.input_phone = QLineEdit()
-        self.input_phone.setPlaceholderText("رقم الهاتف")
+        self.input_phone.setPlaceholderText("رقم الهاتف (الواتساب)")
+        
         self.input_balance = QDoubleSpinBox()
         self.input_balance.setMaximum(9999999.0)
-        self.input_balance.setPrefix("الرصيد/الحساب: ")
+        self.input_balance.setPrefix("الرصيد الابتدائي: ")
         
         btn_add = QPushButton("إضافة مورد")
         btn_add.clicked.connect(self.save_supplier)
-        btn_add.setStyleSheet("background-color: #4a90e2;")
+        btn_add.setStyleSheet("background-color: #2c3e50;")
         
         form_layout.addWidget(self.input_name)
         form_layout.addWidget(self.input_phone)
@@ -707,28 +744,27 @@ class SuppliersPage(QWidget):
         
         layout.addWidget(form_widget)
         
-        # Table
-        self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["الاسم", "الهاتف", "الرصيد المستحق"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.table)
+        self.table_suppliers = QTableWidget()
+        self.table_suppliers.setColumnCount(3)
+        self.table_suppliers.setHorizontalHeaderLabels(["اسم المورد", "رقم الهاتف", "الرصيد الحالي المستحق"])
+        self.table_suppliers.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_suppliers)
         
-        self.setLayout(layout)
+        self.tab_manage.setLayout(layout)
         self.load_suppliers()
 
     def load_suppliers(self):
-        self.table.setRowCount(0)
+        self.table_suppliers.setRowCount(0)
         session = get_session()
         suppliers = session.query(Supplier).all()
         session.close()
         
         for sup in suppliers:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(sup.name))
-            self.table.setItem(row, 1, QTableWidgetItem(sup.phone if sup.phone else ""))
-            self.table.setItem(row, 2, QTableWidgetItem(f"{sup.balance:.2f}"))
+            row = self.table_suppliers.rowCount()
+            self.table_suppliers.insertRow(row)
+            self.table_suppliers.setItem(row, 0, QTableWidgetItem(sup.name))
+            self.table_suppliers.setItem(row, 1, QTableWidgetItem(sup.phone if sup.phone else ""))
+            self.table_suppliers.setItem(row, 2, QTableWidgetItem(f"{sup.balance:.2f}"))
 
     def save_supplier(self):
         name = self.input_name.text().strip()
@@ -756,6 +792,215 @@ class SuppliersPage(QWidget):
         self.input_phone.clear()
         self.input_balance.setValue(0.0)
         self.load_suppliers()
+
+    # --- التبويب الثاني: دفعات الموردين ---
+    def setup_payments_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.combo_suppliers = QComboBox()
+        self.load_suppliers_combo()
+        
+        self.input_pay_amount = QDoubleSpinBox()
+        self.input_pay_amount.setMaximum(9999999.0)
+        self.input_pay_amount.setPrefix("المبلغ: ")
+        
+        self.combo_pay_type = QComboBox()
+        self.combo_pay_type.addItems(["دفعة مسددة له (Pay Out)", "دين بضاعة جديدة (Purchase)"])
+        
+        self.input_pay_note = QLineEdit()
+        self.input_pay_note.setPlaceholderText("ملاحظات / رقم الفاتورة")
+        
+        btn_pay = QPushButton("سجل الحركة المالية")
+        btn_pay.clicked.connect(self.save_transaction)
+        btn_pay.setStyleSheet("background-color: #27ae60;")
+        
+        form_layout.addWidget(self.combo_suppliers)
+        form_layout.addWidget(self.input_pay_amount)
+        form_layout.addWidget(self.combo_pay_type)
+        form_layout.addWidget(self.input_pay_note)
+        form_layout.addWidget(btn_pay)
+        
+        layout.addWidget(form_widget)
+        
+        self.table_transactions = QTableWidget()
+        self.table_transactions.setColumnCount(5)
+        self.table_transactions.setHorizontalHeaderLabels(["المورد", "المبلغ", "النوع", "التاريخ والوقت", "الملاحظات"])
+        self.table_transactions.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_transactions)
+        
+        self.tab_payments.setLayout(layout)
+        self.load_transactions()
+
+    def load_suppliers_combo(self):
+        self.combo_suppliers.clear()
+        session = get_session()
+        suppliers = session.query(Supplier).all()
+        session.close()
+        for sup in suppliers:
+            self.combo_suppliers.addItem(sup.name, sup.id)
+
+    def load_transactions(self):
+        self.table_transactions.setRowCount(0)
+        from database import SupplierTransaction
+        session = get_session()
+        txs = session.query(SupplierTransaction).order_by(SupplierTransaction.date.desc()).all()
+        
+        for t in txs:
+            row = self.table_transactions.rowCount()
+            self.table_transactions.insertRow(row)
+            self.table_transactions.setItem(row, 0, QTableWidgetItem(t.supplier.name if t.supplier else "غير معروف"))
+            self.table_transactions.setItem(row, 1, QTableWidgetItem(f"{t.amount:.2f}"))
+            
+            type_str = "مسدد له ⬇️" if t.type == "pay_out" else "شراء بالدين ⬆️"
+            self.table_transactions.setItem(row, 2, QTableWidgetItem(type_str))
+            self.table_transactions.setItem(row, 3, QTableWidgetItem(t.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_transactions.setItem(row, 4, QTableWidgetItem(t.note if t.note else ""))
+        session.close()
+
+    def save_transaction(self):
+        supplier_id = self.combo_suppliers.currentData()
+        amount = self.input_pay_amount.value()
+        type_index = self.combo_pay_type.currentIndex()
+        note = self.input_pay_note.text().strip()
+        
+        if not supplier_id or amount <= 0:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار المورد وتحديد مبلغ صحيح")
+            return
+            
+        type_code = "pay_out" if type_index == 0 else "purchase_in"
+        
+        from database import SupplierTransaction
+        session = get_session()
+        sup = session.query(Supplier).get(supplier_id)
+        if not sup:
+            session.close()
+            return
+            
+        # تحديث رصيد المورد
+        if type_code == "pay_out":
+            sup.balance -= amount # قمنا بتسديد الدين فقل رصيده لدينا
+        else:
+            sup.balance += amount # اشترينا بضاعة جديدة بالدين فزاد رصيده
+            
+        tx = SupplierTransaction(supplier_id=supplier_id, amount=amount, type=type_code, note=note)
+        session.add(tx)
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "نجاح", "تم تسجيل الحركة وتحديث رصيد المورد بنجاح!")
+        self.input_pay_amount.setValue(0.0)
+        self.input_pay_note.clear()
+        self.load_transactions()
+
+    # --- التبويب الثالث: نظام الطلبات الذكي ---
+    def setup_smart_orders_tab(self):
+        layout = QVBoxLayout()
+        
+        controls = QHBoxLayout()
+        self.input_threshold = QSpinBox()
+        self.input_threshold.setPrefix("حد التنبيه للكمية المتاحة: ")
+        self.input_threshold.setValue(5)
+        
+        btn_generate = QPushButton("🤖 توليد طلبية ذكية")
+        btn_generate.setStyleSheet("background-color: #e67e22; color: white;")
+        btn_generate.clicked.connect(self.generate_smart_order)
+        
+        self.combo_order_suppliers = QComboBox()
+        self.load_suppliers_order_combo()
+        
+        btn_whatsapp = QPushButton("💬 مشاركة الطلب عبر واتساب")
+        btn_whatsapp.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold;")
+        btn_whatsapp.clicked.connect(self.share_via_whatsapp)
+        
+        controls.addWidget(self.input_threshold, 1)
+        controls.addWidget(btn_generate, 1)
+        controls.addWidget(self.combo_order_suppliers, 2)
+        controls.addWidget(btn_whatsapp, 2)
+        
+        layout.addLayout(controls)
+        
+        self.table_order = QTableWidget()
+        self.table_order.setColumnCount(4)
+        self.table_order.setHorizontalHeaderLabels(["اسم الصنف", "الكمية المتاحة", "الحد الأدنى", "الكمية المقترحة لطلبها"])
+        self.table_order.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_order)
+        
+        self.tab_smart_orders.setLayout(layout)
+
+    def load_suppliers_order_combo(self):
+        self.combo_order_suppliers.clear()
+        session = get_session()
+        suppliers = session.query(Supplier).all()
+        session.close()
+        for sup in suppliers:
+            # تخزين رقم الهاتف كبيانات إضافية
+            phone = sup.phone if sup.phone else ""
+            self.combo_order_suppliers.addItem(f"{sup.name} ({phone})", phone)
+
+    def generate_smart_order(self):
+        threshold = self.input_threshold.value()
+        self.table_order.setRowCount(0)
+        
+        session = get_session()
+        # جلب المنتجات التي كميتها تساوي أو تقل عن الحد المطلوب
+        low_stock_products = session.query(Product).filter(Product.quantity <= threshold).all()
+        session.close()
+        
+        if not low_stock_products:
+            QMessageBox.information(self, "حالة جيدة", "لا توجد بضائع ناقصة في المتجر حالياً!")
+            return
+            
+        for prod in low_stock_products:
+            row = self.table_order.rowCount()
+            self.table_order.insertRow(row)
+            self.table_order.setItem(row, 0, QTableWidgetItem(prod.name))
+            self.table_order.setItem(row, 1, QTableWidgetItem(f"{prod.quantity:.2f}" if prod.is_weighted else str(int(prod.quantity))))
+            self.table_order.setItem(row, 2, QTableWidgetItem(str(threshold)))
+            
+            # حساب الكمية المقترحة لطلبها لإكمال النقص (مثلاً 20 قطعة أو 20 كجم كافتراضي)
+            suggested = max(20.0 - prod.quantity, 5.0)
+            suggested_str = f"{suggested:.2f}" if prod.is_weighted else str(int(suggested))
+            self.table_order.setItem(row, 3, QTableWidgetItem(suggested_str))
+
+    def share_via_whatsapp(self):
+        row_count = self.table_order.rowCount()
+        if row_count == 0:
+            QMessageBox.warning(self, "تنبيه", "يرجى توليد الطلبية أولاً!")
+            return
+            
+        supplier_phone = self.combo_order_suppliers.currentData()
+        supplier_name = self.combo_order_suppliers.currentText().split(" (")[0]
+        
+        # تكوين رسالة نصية مرتبة لطلب البضائع
+        message = f"السلام عليكم ورحمة الله وبركاته،\n"
+        message += f"طلب بضاعة جديد لـ *سوبر ماركت المنزل السوري*.\n"
+        message += f"المورد المحترم: *{supplier_name}*\n"
+        message += f"يرجى توفير وتجهيز الأصناف الناقصة التالية:\n\n"
+        
+        for row in range(row_count):
+            prod_name = self.table_order.item(row, 0).text()
+            qty_needed = self.table_order.item(row, 3).text()
+            message += f"▫️ *{prod_name}* -> الكمية المطلوبة: {qty_needed}\n"
+            
+        message += f"\nوشكراً جزيلاً لكم."
+        
+        # تشفير الرسالة لفتح رابط واتساب
+        import urllib.parse
+        import webbrowser
+        
+        encoded_msg = urllib.parse.quote(message)
+        
+        if supplier_phone:
+            # تنظيف رقم الهاتف من الرموز والمسافات
+            clean_phone = "".join(filter(str.isdigit, supplier_phone))
+            url = f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_msg}"
+        else:
+            url = f"https://api.whatsapp.com/send?text={encoded_msg}"
+            
+        webbrowser.open(url)
 
 
 # ==================== PAGE 4: REPORTS & SALES (ADMIN ONLY) ====================

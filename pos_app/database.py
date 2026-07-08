@@ -34,6 +34,17 @@ class Supplier(Base):
     name = Column(String(100), nullable=False)
     phone = Column(String(20))
     balance = Column(Float, default=0.0)
+    transactions = relationship("SupplierTransaction", back_populates="supplier")
+
+class SupplierTransaction(Base):
+    __tablename__ = 'supplier_transactions'
+    id = Column(Integer, primary_key=True)
+    supplier_id = Column(Integer, ForeignKey('suppliers.id'))
+    amount = Column(Float, nullable=False)
+    type = Column(String(20), nullable=False) # 'pay_out' (دفعة له) or 'purchase_in' (شراء بضاعة بالدين)
+    date = Column(DateTime, default=datetime.datetime.now)
+    note = Column(String(255))
+    supplier = relationship("Supplier", back_populates="transactions")
 
 # Setup SQLite DB
 from sqlalchemy import text
@@ -41,9 +52,9 @@ engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT is_weighted FROM products LIMIT 1"))
+        conn.execute(text("SELECT id FROM supplier_transactions LIMIT 1"))
 except Exception:
-    # في حال لم يكن الحقل موجوداً، نقوم بحذف الجداول وإعادة إنشائها بالبنية الجديدة
+    # في حال لم يكن جدول الحركات موجوداً، نقوم بحذف الجداول وإعادة إنشائها بالبنية الجديدة
     Base.metadata.drop_all(engine)
 
 Base.metadata.create_all(engine)
