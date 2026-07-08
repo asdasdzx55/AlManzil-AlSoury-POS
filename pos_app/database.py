@@ -88,13 +88,45 @@ class EmployeeTransaction(Base):
     note = Column(String(255))
     employee = relationship("Employee", back_populates="transactions")
 
+class Expense(Base):
+    __tablename__ = 'expenses'
+    id = Column(Integer, primary_key=True)
+    amount = Column(Float, nullable=False)
+    category = Column(String(100), nullable=False) # 'إيجار', 'كهرباء', 'صيانة', 'أخرى'
+    date = Column(DateTime, default=datetime.datetime.now)
+    note = Column(String(255))
+
+class Invoice(Base):
+    __tablename__ = 'invoices'
+    id = Column(Integer, primary_key=True)
+    total = Column(Float, nullable=False)
+    payment_method = Column(String(50), nullable=False) # 'نقدي', 'فيزا', 'إنستا باي', 'فودافون كاش'
+    date = Column(DateTime, default=datetime.datetime.now)
+    customer_name = Column(String(100))
+    customer_phone = Column(String(50))
+    delivery_employee_id = Column(Integer, ForeignKey('employees.id'), nullable=True)
+    
+    items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
+
+class InvoiceItem(Base):
+    __tablename__ = 'invoice_items'
+    id = Column(Integer, primary_key=True)
+    invoice_id = Column(Integer, ForeignKey('invoices.id'), nullable=False)
+    product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
+    quantity = Column(Float, nullable=False)
+    price = Column(Float, nullable=False) # سعر البيع وقت الحركة
+    cost_price = Column(Float, nullable=False) # سعر التكلفة وقت الحركة
+    
+    invoice = relationship("Invoice", back_populates="items")
+    product = relationship("Product")
+
 # Setup SQLite DB
 from sqlalchemy import text
 engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT id FROM employees LIMIT 1"))
+        conn.execute(text("SELECT id FROM invoices LIMIT 1"))
 except Exception:
     # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)

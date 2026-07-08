@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QTableWidgetItem, QHeaderView, QLineEdit, 
                              QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QSpinBox,
                              QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
-                             QTabWidget)
+                             QTabWidget, QTextEdit, QDateEdit)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence
 from database import get_session, Product, Category, Supplier, User
@@ -608,24 +608,150 @@ class POSPage(QWidget):
             
         session = get_session()
         try:
+            from database import Invoice, InvoiceItem
+            
+            # حساب إجمالي الفاتورة
+            total_amount = sum(item['price'] * item['qty'] for item in self.cart.values())
+            
+            # تسجيل الفاتورة الرئيسية
+            cust_name = self.cust_name.text().strip()
+            cust_phone = self.cust_phone.text().strip()
+            delivery_emp_id = self.combo_delivery.currentData()
+            
+            new_inv = Invoice(
+                total=total_amount,
+                payment_method=self.payment_method.currentText(),
+                customer_name=cust_name if cust_name else None,
+                customer_phone=cust_phone if cust_phone else None,
+                delivery_employee_id=delivery_emp_id
+            )
+            session.add(new_inv)
+            session.commit() # الحفظ للحصول على رقم الفاتورة (new_inv.id)
+            
+            # تسجيل محتويات الفاتورة وخصم المخزون
             for key, item in self.cart.items():
                 prod = session.query(Product).get(item['id'])
                 if prod:
+                    # خصم المخزون
                     if prod.parent_id:
                         parent_prod = session.query(Product).get(prod.parent_id)
                         if parent_prod:
                             parent_prod.quantity -= (item['qty'] * prod.units_in_box)
                     else:
                         prod.quantity -= item['qty']
+                        
+                    # إنشاء تفصيل الفاتورة مع تثبيت سعر التكلفة الحالي لحساب الأرباح بدقة لاحقاً
+                    inv_item = InvoiceItem(
+                        invoice_id=new_inv.id,
+                        product_id=prod.id,
+                        quantity=item['qty'],
+                        price=item['price'],
+                        cost_price=prod.cost_price if prod.cost_price else 0.0
+                    )
+                    session.add(inv_item)
+                    
             session.commit()
             
-            QMessageBox.information(self, "تمت العملية", f"تم تسجيل الفاتورة بنجاح ودفعها عن طريق ({self.payment_method.currentText()})")
+            # عرض الريسيت الحراري التفاعلي
+            dialog = ReceiptDialog(new_inv.id, self)
+            dialog.exec()
+            
+            # تنظيف البيانات
             self.clear_cart()
+            self.cust_name.clear()
+            self.cust_phone.clear()
+            self.cust_address.clear()
+            self.load_delivery_employees()
+            
         except Exception as e:
             session.rollback()
             QMessageBox.critical(self, "خطأ", f"فشل إتمام العملية: {str(e)}")
         finally:
             session.close()
+
+
+# ==================== RECEIPT DIALOG ====================
+class ReceiptDialog(QDialog):
+    def __init__(self, invoice_id, parent=None):
+        super().__init__(parent)
+        self.invoice_id = invoice_id
+        self.setWindowTitle("فاتورة البيع - ريسيت الكاشير")
+        self.resize(380, 550)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setFont(QFont("Courier New", 10))
+        layout.addWidget(self.text_edit)
+        
+        buttons = QHBoxLayout()
+        btn_print = QPushButton("طباعة 🖨️")
+        btn_print.clicked.connect(self.print_receipt)
+        btn_print.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold;")
+        
+        btn_close = QPushButton("إغلاق")
+        btn_close.clicked.connect(self.accept)
+        
+        buttons.addWidget(btn_print)
+        buttons.addWidget(btn_close)
+        layout.addLayout(buttons)
+        self.setLayout(layout)
+        
+        self.generate_receipt_content()
+
+    def generate_receipt_content(self):
+        session = get_session()
+        from database import Invoice
+        inv = session.query(Invoice).get(self.invoice_id)
+        if not inv:
+            session.close()
+            return
+            
+        border = "--------------------------------------\n"
+        html = f"<div style='text-align: center; font-family: monospace;'>"
+        html += f"<h2>سوبر ماركت المنزل السوري</h2>"
+        html += f"<p>دمشق - كاشير المنزل السوري</p>"
+        html += f"<p>هاتف: 0999999999</p>"
+        html += f"<p><b>رقم الفاتورة: #{inv.id}</b></p>"
+        html += f"<p>التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</p>"
+        html += f"</div>"
+        
+        html += f"<pre>{border}"
+        html += f"{'الصنف':<15} | {'الكمية':<6} | {'السعر':<7} | {'الإجمالي':<8}\n"
+        html += f"{border}"
+        
+        for item in inv.items:
+            name_truncated = item.product.name[:13]
+            subtotal = item.price * item.quantity
+            html += f"{name_truncated:<15} | {item.quantity:<6} | {item.price:<7.1f} | {subtotal:<8.1f}\n"
+            
+        html += f"{border}</pre>"
+        
+        html += f"<div style='text-align: right; font-family: monospace; margin-top: 10px;'>"
+        html += f"<p><b>إجمالي الحساب: {inv.total:.2f} ل.س</b></p>"
+        html += f"<p>طريقة الدفع: {inv.payment_method}</p>"
+        if inv.customer_name:
+            html += f"<p>العميل: {inv.customer_name}</p>"
+            if inv.customer_phone:
+                html += f"<p>الهاتف: {inv.customer_phone}</p>"
+        html += f"</div>"
+        
+        html += f"<div style='text-align: center; margin-top: 20px; font-family: monospace;'>"
+        html += f"<p>شكراً لزيارتكم وسعداء بخدمتكم!</p>"
+        html += f"</div>"
+        
+        self.text_edit.setHtml(html)
+        session.close()
+
+    def print_receipt(self):
+        from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        dialog = QPrintDialog(printer, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.text_edit.print(printer)
 
 
 # ==================== QUICK PRODUCT DIALOG (FLOATING) ====================
@@ -1820,6 +1946,94 @@ class SuppliersPage(QWidget):
 
 
 # ==================== PAGE 4: REPORTS & SALES (ADMIN ONLY) ====================
+# ==================== ANALYTICS CHART WIDGET ====================
+from PyQt6.QtGui import QPainter, QBrush, QColor, QPen
+
+class AnalyticsChartWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.sales = 0.0
+        self.purchases = 0.0
+        self.expenses = 0.0
+        self.salaries = 0.0
+        self.profits = 0.0
+        self.setMinimumHeight(250)
+
+    def set_data(self, sales, purchases, expenses, salaries, profits):
+        self.sales = sales
+        self.purchases = purchases
+        self.expenses = expenses
+        self.salaries = salaries
+        self.profits = profits
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        is_dark = self.parent().parent().parent().parent().dark_mode if (hasattr(self.parent().parent().parent().parent(), 'dark_mode')) else True
+        
+        # Background
+        painter.fillRect(self.rect(), QColor("#1e293b") if is_dark else QColor("#ffffff"))
+        
+        labels = ["المبيعات", "المشتريات", "المصاريف", "الرواتب", "الأرباح"]
+        values = [self.sales, self.purchases, self.expenses, self.salaries, self.profits]
+        colors = [
+            QColor("#10b981"),
+            QColor("#3b82f6"),
+            QColor("#ef4444"),
+            QColor("#f59e0b"),
+            QColor("#8b5cf6")
+        ]
+        
+        max_val = max(max(values), 1.0)
+        
+        width = self.width()
+        height = self.height()
+        
+        margin_left = 70
+        margin_bottom = 40
+        margin_top = 25
+        margin_right = 20
+        
+        plot_width = width - margin_left - margin_right
+        plot_height = height - margin_top - margin_bottom
+        
+        # Draw Y-Axis lines
+        pen = QPen(QColor("#475569") if is_dark else QColor("#cbd5e1"), 1, Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        for i in range(5):
+            y = margin_top + plot_height * (i / 4)
+            painter.drawLine(margin_left, int(y), width - margin_right, int(y))
+            val_label = max_val * (1.0 - i / 4)
+            painter.drawText(15, int(y) + 5, f"{val_label:.0f}")
+            
+        # Draw Bars
+        bar_count = len(labels)
+        bar_width = int(plot_width / (bar_count * 1.8))
+        gap = int((plot_width - bar_width * bar_count) / (bar_count + 1))
+        
+        for i in range(bar_count):
+            val = values[i]
+            bar_height = int(plot_height * (max(val, 0.0) / max_val))
+            
+            x = margin_left + gap + i * (bar_width + gap)
+            y = margin_top + plot_height - bar_height
+            
+            # Fill Bar
+            painter.setBrush(QBrush(colors[i]))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(x, y, bar_width, bar_height, 6, 6)
+            
+            # Draw Value Label on top of Bar
+            painter.setPen(QColor("#cbd5e1") if is_dark else QColor("#1e293b"))
+            painter.drawText(x + 5, y - 5, f"{val:.0f}")
+            
+            # Draw Label at bottom of Bar
+            painter.drawText(x + 5, margin_top + plot_height + 22, labels[i])
+
+
+# ==================== PAGE 4: REPORTS & SALES (ADMIN ONLY) ====================
 class ReportsPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -1827,57 +2041,320 @@ class ReportsPage(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout()
-        header = QLabel("📈 التقارير والمبيعات")
-        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
-        layout.addWidget(header)
         
-        # Small stats widgets
-        stats_layout = QHBoxLayout()
+        top_layout = QHBoxLayout()
+        header = QLabel("📈 التقارير المالية والتحليلات")
+        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50;")
         
-        self.total_sales_card = QLabel("إجمالي المبيعات: 0.00 ل.س")
-        self.total_sales_card.setStyleSheet("background-color: #2ecc71; color: white; font-size: 16px; padding: 20px; border-radius: 8px; font-weight: bold;")
-        self.total_sales_card.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        filter_group = QGroupBox("تصفية بالتواريخ")
+        filter_layout = QHBoxLayout(filter_group)
         
-        self.total_products_card = QLabel("عدد الأصناف بالمخزن: 0")
-        self.total_products_card.setStyleSheet("background-color: #3498db; color: white; font-size: 16px; padding: 20px; border-radius: 8px; font-weight: bold;")
-        self.total_products_card.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        import datetime
+        today = datetime.date.today()
+        self.date_from.setDate(today.replace(day=1))
         
-        stats_layout.addWidget(self.total_sales_card)
-        stats_layout.addWidget(self.total_products_card)
-        layout.addLayout(stats_layout)
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(today)
         
-        # Recent sales placeholder or description
-        info_label = QLabel("سجل المبيعات الأخيرة وجرد المخزون:")
-        info_label.setStyleSheet("font-weight: bold; margin-top: 20px;")
-        layout.addWidget(info_label)
+        btn_refresh = QPushButton("تحديث البيانات 🔄")
+        btn_refresh.clicked.connect(self.load_reports)
+        btn_refresh.setStyleSheet("background-color: #2c3e50; color: white;")
         
-        self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["الصنف", "الكمية الحالية", "سعر البيع"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.table)
+        btn_export = QPushButton("تصدير للتميز Excel 📥")
+        btn_export.clicked.connect(self.export_to_csv)
+        btn_export.setStyleSheet("background-color: #10b981; color: white; font-weight: bold;")
         
+        filter_layout.addWidget(QLabel("من:"))
+        filter_layout.addWidget(self.date_from)
+        filter_layout.addWidget(QLabel("إلى:"))
+        filter_layout.addWidget(self.date_to)
+        filter_layout.addWidget(btn_refresh)
+        filter_layout.addWidget(btn_export)
+        
+        top_layout.addWidget(header, 2)
+        top_layout.addWidget(filter_group, 3)
+        layout.addLayout(top_layout)
+        
+        self.tabs = QTabWidget()
+        self.tab_dashboard = QWidget()
+        self.tab_sales = QWidget()
+        self.tab_purchases = QWidget()
+        self.tab_expenses = QWidget()
+        
+        self.tabs.addTab(self.tab_dashboard, "📊 لوحة الأرباح والرسوم البيانية")
+        self.tabs.addTab(self.tab_sales, "🛒 سجل المبيعات والفواتير")
+        self.tabs.addTab(self.tab_purchases, "📥 سجل حركات المشتريات")
+        self.tabs.addTab(self.tab_expenses, "💸 إدارة وتسجيل المصاريف")
+        
+        self.setup_dashboard_tab()
+        self.setup_sales_tab()
+        self.setup_purchases_tab()
+        self.setup_expenses_tab()
+        
+        layout.addWidget(self.tabs)
         self.setLayout(layout)
+
+    def setup_dashboard_tab(self):
+        layout = QVBoxLayout()
+        
+        cards_layout = QHBoxLayout()
+        
+        self.card_sales = QLabel("إجمالي المبيعات\n0.00 ل.س")
+        self.card_sales.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.card_sales.setStyleSheet("background-color: #10b981; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
+        
+        self.card_purchases = QLabel("إجمالي المشتريات\n0.00 ل.س")
+        self.card_purchases.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.card_purchases.setStyleSheet("background-color: #3b82f6; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
+        
+        self.card_expenses = QLabel("إجمالي المصاريف\n0.00 ل.س")
+        self.card_expenses.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.card_expenses.setStyleSheet("background-color: #ef4444; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
+        
+        self.card_salaries = QLabel("رواتب الموظفين\n0.00 ل.س")
+        self.card_salaries.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.card_salaries.setStyleSheet("background-color: #f59e0b; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
+        
+        self.card_profits = QLabel("الأرباح الصافية\n0.00 ل.س")
+        self.card_profits.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.card_profits.setStyleSheet("background-color: #8b5cf6; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
+        
+        cards_layout.addWidget(self.card_sales)
+        cards_layout.addWidget(self.card_purchases)
+        cards_layout.addWidget(self.card_expenses)
+        cards_layout.addWidget(self.card_salaries)
+        cards_layout.addWidget(self.card_profits)
+        layout.addLayout(cards_layout)
+        
+        layout.addWidget(QLabel("📈 رسم بياني للمقارنة المالية:"))
+        self.chart = AnalyticsChartWidget(self)
+        layout.addWidget(self.chart)
+        
+        self.tab_dashboard.setLayout(layout)
+
+    def setup_sales_tab(self):
+        layout = QVBoxLayout()
+        self.table_sales = QTableWidget()
+        self.table_sales.setColumnCount(5)
+        self.table_sales.setHorizontalHeaderLabels(["رقم الفاتورة", "التاريخ والوقت", "العميل", "طريقة الدفع", "الإجمالي"])
+        self.table_sales.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_sales.doubleClicked.connect(self.show_sales_invoice_details)
+        layout.addWidget(self.table_sales)
+        self.tab_sales.setLayout(layout)
+
+    def show_sales_invoice_details(self):
+        row = self.table_sales.currentRow()
+        if row >= 0:
+            inv_id = int(self.table_sales.item(row, 0).text().replace("#", ""))
+            dialog = ReceiptDialog(inv_id, self)
+            dialog.exec()
+
+    def setup_purchases_tab(self):
+        layout = QVBoxLayout()
+        self.table_purchases = QTableWidget()
+        self.table_purchases.setColumnCount(5)
+        self.table_purchases.setHorizontalHeaderLabels(["المورد", "المبلغ", "النوع", "التاريخ والوقت", "الملاحظات"])
+        self.table_purchases.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_purchases)
+        self.tab_purchases.setLayout(layout)
+
+    def setup_expenses_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.input_exp_amount = QDoubleSpinBox()
+        self.input_exp_amount.setMaximum(999999.0)
+        self.input_exp_amount.setPrefix("قيمة المصروف: ")
+        
+        self.combo_exp_cat = QComboBox()
+        self.combo_exp_cat.addItems(["كهرباء ومياه", "إيجار المحل", "صيانة وإصلاحات", "نقل وتوصيل", "رواتب طارئة", "أخرى"])
+        
+        self.input_exp_note = QLineEdit()
+        self.input_exp_note.setPlaceholderText("ملاحظات / فواتير المصاريف...")
+        
+        btn_add_exp = QPushButton("سجل المصروف 💸")
+        btn_add_exp.clicked.connect(self.save_expense)
+        btn_add_exp.setStyleSheet("background-color: #ef4444; color: white;")
+        
+        form_layout.addWidget(self.input_exp_amount)
+        form_layout.addWidget(self.combo_exp_cat)
+        form_layout.addWidget(self.input_exp_note)
+        form_layout.addWidget(btn_add_exp)
+        layout.addWidget(form_widget)
+        
+        self.table_expenses = QTableWidget()
+        self.table_expenses.setColumnCount(4)
+        self.table_expenses.setHorizontalHeaderLabels(["القيمة", "التصنيف", "التاريخ والوقت", "الملاحظات"])
+        self.table_expenses.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_expenses)
+        
+        self.tab_expenses.setLayout(layout)
+
+    def save_expense(self):
+        amount = self.input_exp_amount.value()
+        category = self.combo_exp_cat.currentText()
+        note = self.input_exp_note.text().strip()
+        
+        if amount <= 0:
+            QMessageBox.warning(self, "تنبيه", "يرجى تحديد مبلغ مصروف صحيح")
+            return
+            
+        session = get_session()
+        from database import Expense
+        exp = Expense(amount=amount, category=category, note=note)
+        session.add(exp)
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "نجاح", "تم تسجيل المصروف بنجاح!")
+        self.input_exp_amount.setValue(0.0)
+        self.input_exp_note.clear()
         self.load_reports()
 
     def load_reports(self):
+        dt_from = self.date_from.date().toPyDate()
+        dt_to = self.date_to.date().toPyDate()
+        
+        import datetime
+        datetime_from = datetime.datetime.combine(dt_from, datetime.time.min)
+        datetime_to = datetime.datetime.combine(dt_to, datetime.time.max)
+        
         session = get_session()
+        from database import Invoice, SupplierTransaction, Expense, EmployeeTransaction, InvoiceItem
         
-        # Calculate total products in stock
-        total_products = session.query(Product).count()
-        self.total_products_card.setText(f"عدد الأصناف بالمخزن: {total_products}")
+        sales_query = session.query(Invoice).filter(Invoice.date >= datetime_from, Invoice.date <= datetime_to).all()
+        total_sales = sum(inv.total for inv in sales_query)
         
-        # Load active inventory statuses
-        products = session.query(Product).all()
-        self.table.setRowCount(0)
-        for prod in products:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(prod.name))
-            self.table.setItem(row, 1, QTableWidgetItem(str(prod.quantity)))
-            self.table.setItem(row, 2, QTableWidgetItem(f"{prod.price:.2f}"))
+        purchases_query = session.query(SupplierTransaction).filter(
+            SupplierTransaction.type == 'purchase_in',
+            SupplierTransaction.date >= datetime_from,
+            SupplierTransaction.date <= datetime_to
+        ).all()
+        total_purchases = sum(p.amount for p in purchases_query)
+        
+        expenses_query = session.query(Expense).filter(Expense.date >= datetime_from, Expense.date <= datetime_to).all()
+        total_expenses = sum(exp.amount for exp in expenses_query)
+        
+        salaries_query = session.query(EmployeeTransaction).filter(
+            EmployeeTransaction.type == 'salary_payment',
+            EmployeeTransaction.date >= datetime_from,
+            EmployeeTransaction.date <= datetime_to
+        ).all()
+        total_salaries = sum(s.amount for s in salaries_query)
+        
+        total_cost_of_goods = 0.0
+        invoice_ids = [inv.id for inv in sales_query]
+        if invoice_ids:
+            items_query = session.query(InvoiceItem).filter(InvoiceItem.invoice_id.in_(invoice_ids)).all()
+            total_cost_of_goods = sum(item.cost_price * item.quantity for item in items_query)
+            
+        net_profits = total_sales - total_cost_of_goods - total_expenses - total_salaries
+        
+        self.card_sales.setText(f"إجمالي المبيعات\n{total_sales:.2f} ل.س")
+        self.card_purchases.setText(f"إجمالي المشتريات\n{total_purchases:.2f} ل.س")
+        self.card_expenses.setText(f"إجمالي المصاريف\n{total_expenses:.2f} ل.س")
+        self.card_salaries.setText(f"رواتب الموظفين\n{total_salaries:.2f} ل.س")
+        self.card_profits.setText(f"الأرباح الصافية\n{net_profits:.2f} ل.س")
+        
+        self.chart.set_data(total_sales, total_purchases, total_expenses, total_salaries, net_profits)
+        
+        self.table_sales.setRowCount(0)
+        for inv in sales_query:
+            row = self.table_sales.rowCount()
+            self.table_sales.insertRow(row)
+            self.table_sales.setItem(row, 0, QTableWidgetItem(f"#{inv.id}"))
+            self.table_sales.setItem(row, 1, QTableWidgetItem(inv.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_sales.setItem(row, 2, QTableWidgetItem(inv.customer_name if inv.customer_name else "عميل سفري"))
+            self.table_sales.setItem(row, 3, QTableWidgetItem(inv.payment_method))
+            self.table_sales.setItem(row, 4, QTableWidgetItem(f"{inv.total:.2f}"))
+            
+        self.table_purchases.setRowCount(0)
+        for p in purchases_query:
+            row = self.table_purchases.rowCount()
+            self.table_purchases.insertRow(row)
+            self.table_purchases.setItem(row, 0, QTableWidgetItem(p.supplier.name if p.supplier else "مورد غير معروف"))
+            self.table_purchases.setItem(row, 1, QTableWidgetItem(f"{p.amount:.2f}"))
+            self.table_purchases.setItem(row, 2, QTableWidgetItem("شراء بالدين"))
+            self.table_purchases.setItem(row, 3, QTableWidgetItem(p.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_purchases.setItem(row, 4, QTableWidgetItem(p.note if p.note else ""))
+            
+        self.table_expenses.setRowCount(0)
+        for exp in expenses_query:
+            row = self.table_expenses.rowCount()
+            self.table_expenses.insertRow(row)
+            self.table_expenses.setItem(row, 0, QTableWidgetItem(f"{exp.amount:.2f}"))
+            self.table_expenses.setItem(row, 1, QTableWidgetItem(exp.category))
+            self.table_expenses.setItem(row, 2, QTableWidgetItem(exp.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_expenses.setItem(row, 3, QTableWidgetItem(exp.note if exp.note else ""))
             
         session.close()
+
+    def export_to_csv(self):
+        from PyQt6.QtWidgets import QFileDialog
+        filename, _ = QFileDialog.getSaveFileName(self, "حفظ التقرير كـ CSV", "", "CSV Files (*.csv)")
+        if not filename:
+            return
+            
+        import csv
+        session = get_session()
+        from database import Invoice, SupplierTransaction, Expense, EmployeeTransaction, InvoiceItem
+        
+        dt_from = self.date_from.date().toPyDate()
+        dt_to = self.date_to.date().toPyDate()
+        import datetime
+        datetime_from = datetime.datetime.combine(dt_from, datetime.time.min)
+        datetime_to = datetime.datetime.combine(dt_to, datetime.time.max)
+        
+        try:
+            with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f)
+                writer.writerow(["تقرير مالي شامل لـ كاشير المنزل السوري"])
+                writer.writerow([f"الفترة من: {dt_from} إلى: {dt_to}"])
+                writer.writerow([])
+                
+                sales_query = session.query(Invoice).filter(Invoice.date >= datetime_from, Invoice.date <= datetime_to).all()
+                total_sales = sum(inv.total for inv in sales_query)
+                
+                purchases_query = session.query(SupplierTransaction).filter(SupplierTransaction.type == 'purchase_in', SupplierTransaction.date >= datetime_from, SupplierTransaction.date <= datetime_to).all()
+                total_purchases = sum(p.amount for p in purchases_query)
+                
+                expenses_query = session.query(Expense).filter(Expense.date >= datetime_from, Expense.date <= datetime_to).all()
+                total_expenses = sum(exp.amount for exp in expenses_query)
+                
+                salaries_query = session.query(EmployeeTransaction).filter(EmployeeTransaction.type == 'salary_payment', EmployeeTransaction.date >= datetime_from, EmployeeTransaction.date <= datetime_to).all()
+                total_salaries = sum(s.amount for s in salaries_query)
+                
+                total_cost_of_goods = 0.0
+                invoice_ids = [inv.id for inv in sales_query]
+                if invoice_ids:
+                    items_query = session.query(InvoiceItem).filter(InvoiceItem.invoice_id.in_(invoice_ids)).all()
+                    total_cost_of_goods = sum(item.cost_price * item.quantity for item in items_query)
+                net_profits = total_sales - total_cost_of_goods - total_expenses - total_salaries
+                
+                writer.writerow(["--- ملخص الميزانية والأرباح ---"])
+                writer.writerow(["إجمالي المبيعات", f"{total_sales:.2f} ل.س"])
+                writer.writerow(["إجمالي تكلفة المبيعات", f"{total_cost_of_goods:.2f} ل.س"])
+                writer.writerow(["إجمالي مشتريات البضاعة", f"{total_purchases:.2f} ل.س"])
+                writer.writerow(["إجمالي المصاريف والتشغيل", f"{total_expenses:.2f} ل.س"])
+                writer.writerow(["رواتب الموظفين", f"{total_salaries:.2f} ل.س"])
+                writer.writerow(["الأرباح الصافية (Net Profit)", f"{net_profits:.2f} ل.س"])
+                writer.writerow([])
+                
+                writer.writerow(["--- سجل الفواتير والمبيعات ---"])
+                writer.writerow(["رقم الفاتورة", "التاريخ", "العميل", "طريقة الدفع", "الإجمالي"])
+                for inv in sales_query:
+                    writer.writerow([inv.id, inv.date.strftime("%Y-%m-%d %H:%M"), inv.customer_name if inv.customer_name else "عميل سفري", inv.payment_method, inv.total])
+                
+            QMessageBox.information(self, "نجاح التصدير", "تم تصدير التقرير المالي كملف CSV لـ Excel بنجاح!")
+        except Exception as e:
+            QMessageBox.critical(self, "خطأ", f"فشل تصدير الملف: {str(e)}")
+        finally:
+            session.close()
 
 
 # ==================== PAGE 5: SYNC PAGE ====================
