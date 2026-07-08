@@ -64,6 +64,12 @@ class DashboardWindow(QWidget):
         self.btn_suppliers.clicked.connect(lambda: self.switch_page(3))
         sidebar_layout.addWidget(self.btn_suppliers)
         
+        self.btn_hr = QPushButton("👤")
+        self.btn_hr.setToolTip("إدارة شؤون الموظفين والرواتب (HR)")
+        self.btn_hr.setCheckable(True)
+        self.btn_hr.clicked.connect(lambda: self.switch_page(4))
+        sidebar_layout.addWidget(self.btn_hr)
+        
         self.btn_reports = QPushButton("📈")
         self.btn_reports.setToolTip("التقارير والمبيعات")
         self.btn_reports.setCheckable(True)
@@ -71,13 +77,13 @@ class DashboardWindow(QWidget):
             self.btn_reports.setEnabled(False)
             self.btn_reports.setToolTip("هذه الصفحة متاحة للمدير فقط")
             self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 24px;")
-        self.btn_reports.clicked.connect(lambda: self.switch_page(4))
+        self.btn_reports.clicked.connect(lambda: self.switch_page(5))
         sidebar_layout.addWidget(self.btn_reports)
         
         self.btn_sync = QPushButton("🔄")
         self.btn_sync.setToolTip("المزامنة السحابية")
         self.btn_sync.setCheckable(True)
-        self.btn_sync.clicked.connect(lambda: self.switch_page(5))
+        self.btn_sync.clicked.connect(lambda: self.switch_page(6))
         sidebar_layout.addWidget(self.btn_sync)
         
         sidebar_layout.addStretch()
@@ -95,7 +101,7 @@ class DashboardWindow(QWidget):
         btn_logout.clicked.connect(self.on_logout)
         sidebar_layout.addWidget(btn_logout)
         
-        self.menu_buttons = [self.btn_pos, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_reports, self.btn_sync]
+        self.menu_buttons = [self.btn_pos, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_hr, self.btn_reports, self.btn_sync]
         
         # 2. حاوي الصفحات الرئيسي (مستجيب وقابل للتمدد)
         self.container = QStackedWidget()
@@ -105,6 +111,7 @@ class DashboardWindow(QWidget):
         self.page_purchases = PurchasesPage()
         self.page_inventory = InventoryPage()
         self.page_suppliers = SuppliersPage()
+        self.page_hr = HRPage()
         self.page_reports = ReportsPage()
         self.page_sync = SyncPage()
         
@@ -112,6 +119,7 @@ class DashboardWindow(QWidget):
         self.container.addWidget(self.page_purchases)
         self.container.addWidget(self.page_inventory)
         self.container.addWidget(self.page_suppliers)
+        self.container.addWidget(self.page_hr)
         self.container.addWidget(self.page_reports)
         self.container.addWidget(self.page_sync)
         
@@ -126,13 +134,17 @@ class DashboardWindow(QWidget):
             btn.setChecked(i == index)
         self.container.setCurrentIndex(index)
         
-        if index == 1:
+        if index == 0:
+            self.page_pos.load_delivery_employees()
+        elif index == 1:
             self.page_purchases.load_suppliers()
         elif index == 2:
             self.page_inventory.load_products()
         elif index == 3:
             self.page_suppliers.load_suppliers()
         elif index == 4:
+            self.page_hr.load_employees()
+        elif index == 5:
             self.page_reports.load_reports()
 
     def toggle_theme(self):
@@ -326,9 +338,14 @@ class POSPage(QWidget):
         self.cust_address = QLineEdit()
         self.cust_address.setPlaceholderText("عنوان التوصيل")
         
+        self.combo_delivery = QComboBox()
+        self.combo_delivery.setPlaceholderText("طيار الديلفري")
+        self.load_delivery_employees()
+        
         cust_layout.addWidget(self.cust_name)
         cust_layout.addWidget(self.cust_phone)
         cust_layout.addWidget(self.cust_address)
+        cust_layout.addWidget(self.combo_delivery)
         
         # طريقة الدفع
         payment_group = QGroupBox("طريقة الدفع")
@@ -362,6 +379,16 @@ class POSPage(QWidget):
         
         layout.addLayout(bottom_layout)
         self.setLayout(layout)
+
+    def load_delivery_employees(self):
+        self.combo_delivery.clear()
+        self.combo_delivery.addItem("بدون ديلفري (سفري)", None)
+        session = get_session()
+        from database import Employee
+        delivery_boys = session.query(Employee).filter_by(role='delivery').all()
+        for emp in delivery_boys:
+            self.combo_delivery.addItem(emp.name, emp.id)
+        session.close()
 
     def setup_shortcuts(self):
         # F1: التركيز على حقل البحث
@@ -1908,3 +1935,271 @@ class SyncPage(QWidget):
         else:
             QMessageBox.warning(self, "فشل المزامنة", msg)
             self.status_label.setText("الحالة: فشل التحميل")
+
+
+# ==================== PAGE 6: HR / EMPLOYEES ====================
+class HRPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        header = QLabel("👤 إدارة الموارد البشرية وشؤون الموظفين (HR)")
+        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;")
+        layout.addWidget(header)
+        
+        # إنشاء نظام التبويبات
+        self.tabs = QTabWidget()
+        
+        self.tab_employees = QWidget()
+        self.tab_payments = QWidget()
+        
+        self.tabs.addTab(self.tab_employees, "👥 ملفات الموظفين")
+        self.tabs.addTab(self.tab_payments, "💰 الرواتب والخصومات والمكافآت")
+        
+        self.setup_employees_tab()
+        self.setup_payments_tab()
+        
+        layout.addWidget(self.tabs)
+        self.setLayout(layout)
+        
+        self.tabs.currentChanged.connect(self.on_tab_changed)
+
+    def on_tab_changed(self, index):
+        if index == 0:
+            self.load_employees()
+        elif index == 1:
+            self.load_employees_combo()
+            self.load_transactions()
+
+    # --- التبويب الأول: ملفات الموظفين ---
+    def setup_employees_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.input_emp_name = QLineEdit()
+        self.input_emp_name.setPlaceholderText("اسم الموظف الجديد")
+        self.input_emp_phone = QLineEdit()
+        self.input_emp_phone.setPlaceholderText("رقم الهاتف")
+        
+        self.combo_emp_role = QComboBox()
+        self.combo_emp_role.addItem("ديلفري (طيار)", "delivery")
+        self.combo_emp_role.addItem("كاشير", "cashier")
+        self.combo_emp_role.addItem("أخرى", "other")
+        
+        self.input_emp_salary = QDoubleSpinBox()
+        self.input_emp_salary.setMaximum(999999.0)
+        self.input_emp_salary.setPrefix("الراتب الأساسي: ")
+        
+        btn_add = QPushButton("حفظ الموظف")
+        btn_add.clicked.connect(self.save_employee)
+        btn_add.setStyleSheet("background-color: #2c3e50;")
+        
+        form_layout.addWidget(self.input_emp_name)
+        form_layout.addWidget(self.input_emp_phone)
+        form_layout.addWidget(self.combo_emp_role)
+        form_layout.addWidget(self.input_emp_salary)
+        form_layout.addWidget(btn_add)
+        
+        layout.addWidget(form_widget)
+        
+        self.table_employees = QTableWidget()
+        self.table_employees.setColumnCount(5)
+        self.table_employees.setHorizontalHeaderLabels(["المعرف", "الاسم", "رقم الهاتف", "الوظيفة", "الراتب"])
+        self.table_employees.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_employees.doubleClicked.connect(self.load_row_to_emp_form)
+        layout.addWidget(self.table_employees)
+        
+        # أزرار التعديل والحذف
+        buttons_layout = QHBoxLayout()
+        
+        btn_delete = QPushButton("❌ حذف الموظف المحدد")
+        btn_delete.clicked.connect(self.delete_employee)
+        btn_delete.setObjectName("dangerButton")
+        
+        buttons_layout.addWidget(btn_delete)
+        layout.addLayout(buttons_layout)
+        
+        self.tab_employees.setLayout(layout)
+        self.load_employees()
+
+    def load_employees(self):
+        self.table_employees.setRowCount(0)
+        session = get_session()
+        from database import Employee
+        employees = session.query(Employee).all()
+        session.close()
+        
+        for emp in employees:
+            row = self.table_employees.rowCount()
+            self.table_employees.insertRow(row)
+            self.table_employees.setItem(row, 0, QTableWidgetItem(str(emp.id)))
+            self.table_employees.setItem(row, 1, QTableWidgetItem(emp.name))
+            self.table_employees.setItem(row, 2, QTableWidgetItem(emp.phone if emp.phone else ""))
+            
+            role_map = {"delivery": "ديلفري (طيار)", "cashier": "كاشير", "other": "أخرى"}
+            self.table_employees.setItem(row, 3, QTableWidgetItem(role_map.get(emp.role, emp.role)))
+            self.table_employees.setItem(row, 4, QTableWidgetItem(f"{emp.salary:.2f}"))
+
+    def save_employee(self):
+        name = self.input_emp_name.text().strip()
+        phone = self.input_emp_phone.text().strip()
+        role = self.combo_emp_role.currentData()
+        salary = self.input_emp_salary.value()
+        
+        if not name:
+            QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم الموظف")
+            return
+            
+        session = get_session()
+        from database import Employee
+        emp = session.query(Employee).filter_by(name=name).first()
+        if emp:
+            emp.phone = phone
+            emp.role = role
+            emp.salary = salary
+        else:
+            emp = Employee(name=name, phone=phone, role=role, salary=salary)
+            session.add(emp)
+            
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "تم الحفظ", "تم حفظ بيانات الموظف بنجاح!")
+        self.input_emp_name.clear()
+        self.input_emp_phone.clear()
+        self.input_emp_salary.setValue(0.0)
+        self.load_employees()
+
+    def load_row_to_emp_form(self):
+        row = self.table_employees.currentRow()
+        if row >= 0:
+            self.input_emp_name.setText(self.table_employees.item(row, 1).text())
+            self.input_emp_phone.setText(self.table_employees.item(row, 2).text())
+            
+            role_text = self.table_employees.item(row, 3).text()
+            role_map_rev = {"ديلفري (طيار)": "delivery", "كاشير": "cashier", "أخرى": "other"}
+            idx = self.combo_emp_role.findData(role_map_rev.get(role_text, "other"))
+            if idx >= 0:
+                self.combo_emp_role.setCurrentIndex(idx)
+                
+            self.input_emp_salary.setValue(float(self.table_employees.item(row, 4).text()))
+
+    def delete_employee(self):
+        row = self.table_employees.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار موظف لحذفه أولاً")
+            return
+            
+        emp_id = int(self.table_employees.item(row, 0).text())
+        emp_name = self.table_employees.item(row, 1).text()
+        
+        reply = QMessageBox.question(self, "تأكيد الحذف", f"هل أنت متأكد من حذف الموظف: {emp_name}؟",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            session = get_session()
+            from database import Employee
+            emp = session.query(Employee).get(emp_id)
+            if emp:
+                session.delete(emp)
+                session.commit()
+            session.close()
+            
+            QMessageBox.information(self, "تم الحذف", "تم حذف الموظف بنجاح!")
+            self.load_employees()
+
+    # --- التبويب الثاني: الحركات المالية ---
+    def setup_payments_tab(self):
+        layout = QVBoxLayout()
+        
+        form_widget = QWidget()
+        form_layout = QHBoxLayout(form_widget)
+        
+        self.combo_pay_employees = QComboBox()
+        self.load_employees_combo()
+        
+        self.input_trans_amount = QDoubleSpinBox()
+        self.input_trans_amount.setMaximum(999999.0)
+        self.input_trans_amount.setPrefix("المبلغ: ")
+        
+        self.combo_trans_type = QComboBox()
+        self.combo_trans_type.addItem("دفع راتب", "salary_payment")
+        self.combo_trans_type.addItem("تسجيل خصم/جزاء", "deduction")
+        self.combo_trans_type.addItem("مكافأة/جائزة", "reward")
+        
+        self.input_trans_note = QLineEdit()
+        self.input_trans_note.setPlaceholderText("ملاحظات / سبب الخصم أو الجائزة")
+        
+        btn_trans_save = QPushButton("سجل المعاملة المالية")
+        btn_trans_save.clicked.connect(self.save_employee_transaction)
+        btn_trans_save.setStyleSheet("background-color: #27ae60;")
+        
+        form_layout.addWidget(self.combo_pay_employees)
+        form_layout.addWidget(self.input_trans_amount)
+        form_layout.addWidget(self.combo_trans_type)
+        form_layout.addWidget(self.input_trans_note)
+        form_layout.addWidget(btn_trans_save)
+        
+        layout.addWidget(form_widget)
+        
+        self.table_emp_transactions = QTableWidget()
+        self.table_emp_transactions.setColumnCount(5)
+        self.table_emp_transactions.setHorizontalHeaderLabels(["الموظف", "المبلغ", "النوع", "التاريخ والوقت", "الملاحظات"])
+        self.table_emp_transactions.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table_emp_transactions)
+        
+        self.tab_payments.setLayout(layout)
+        self.load_transactions()
+
+    def load_employees_combo(self):
+        self.combo_pay_employees.clear()
+        session = get_session()
+        from database import Employee
+        employees = session.query(Employee).all()
+        session.close()
+        for emp in employees:
+            self.combo_pay_employees.addItem(emp.name, emp.id)
+
+    def load_transactions(self):
+        self.table_emp_transactions.setRowCount(0)
+        session = get_session()
+        from database import EmployeeTransaction
+        txs = session.query(EmployeeTransaction).order_by(EmployeeTransaction.date.desc()).all()
+        
+        for t in txs:
+            row = self.table_emp_transactions.rowCount()
+            self.table_emp_transactions.insertRow(row)
+            self.table_emp_transactions.setItem(row, 0, QTableWidgetItem(t.employee.name if t.employee else "غير معروف"))
+            self.table_emp_transactions.setItem(row, 1, QTableWidgetItem(f"{t.amount:.2f}"))
+            
+            type_map = {"salary_payment": "دفع راتب 💵", "deduction": "خصم/جزاء 📉", "reward": "مكافأة/جائزة 📈"}
+            self.table_emp_transactions.setItem(row, 2, QTableWidgetItem(type_map.get(t.type, t.type)))
+            self.table_emp_transactions.setItem(row, 3, QTableWidgetItem(t.date.strftime("%Y-%m-%d %H:%M")))
+            self.table_emp_transactions.setItem(row, 4, QTableWidgetItem(t.note if t.note else ""))
+        session.close()
+
+    def save_employee_transaction(self):
+        emp_id = self.combo_pay_employees.currentData()
+        amount = self.input_trans_amount.value()
+        trans_type = self.combo_trans_type.currentData()
+        note = self.input_trans_note.text().strip()
+        
+        if not emp_id or amount <= 0:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار موظف وتحديد مبلغ صحيح")
+            return
+            
+        session = get_session()
+        from database import EmployeeTransaction
+        tx = EmployeeTransaction(employee_id=emp_id, amount=amount, type=trans_type, note=note)
+        session.add(tx)
+        session.commit()
+        session.close()
+        
+        QMessageBox.information(self, "نجاح", "تم تسجيل المعاملة المالية للموظف بنجاح!")
+        self.input_trans_amount.setValue(0.0)
+        self.input_trans_note.clear()
+        self.load_transactions()

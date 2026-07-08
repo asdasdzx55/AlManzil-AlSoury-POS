@@ -69,13 +69,32 @@ class SupplierTransaction(Base):
     note = Column(String(255))
     supplier = relationship("Supplier", back_populates="transactions")
 
+class Employee(Base):
+    __tablename__ = 'employees'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    role = Column(String(50), nullable=False) # 'delivery' (ديلفري), 'cashier' (كاشير), 'other' (أخرى)
+    phone = Column(String(20))
+    salary = Column(Float, default=0.0)
+    transactions = relationship("EmployeeTransaction", back_populates="employee", cascade="all, delete-orphan")
+
+class EmployeeTransaction(Base):
+    __tablename__ = 'employee_transactions'
+    id = Column(Integer, primary_key=True)
+    employee_id = Column(Integer, ForeignKey('employees.id'), nullable=False)
+    amount = Column(Float, nullable=False)
+    type = Column(String(50), nullable=False) # 'salary_payment', 'deduction', 'reward'
+    date = Column(DateTime, default=datetime.datetime.now)
+    note = Column(String(255))
+    employee = relationship("Employee", back_populates="transactions")
+
 # Setup SQLite DB
 from sqlalchemy import text
 engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT cost_price FROM products LIMIT 1"))
+        conn.execute(text("SELECT id FROM employees LIMIT 1"))
 except Exception:
     # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)
