@@ -1,0 +1,163 @@
+/* Premium Light Theme for Supermarket POS */
+
+QWidget {
+    background-color: #f8fafc;
+    font-family: 'Cairo', 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    color: #334155;
+}
+
+/* Sidebar Specifics */
+QWidget#sidebar {
+    background-color: #ffffff;
+    border-left: 1px solid #e2e8f0;
+}
+
+QWidget#sidebar QPushButton {
+    background-color: transparent;
+    color: #64748b;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 5px;
+    text-align: center;
+    font-size: 24px;
+}
+
+QWidget#sidebar QPushButton:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+QWidget#sidebar QPushButton:checked {
+    background-color: #e0f2fe;
+    color: #0ea5e9;
+}
+
+QPushButton {
+    background-color: #ffffff;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+QPushButton:pressed {
+    background-color: #cbd5e1;
+}
+
+/* Primary/Success Buttons */
+QPushButton[styleSheetClass="primary"] {
+    background-color: #10b981;
+    color: #ffffff;
+    border: none;
+}
+
+QPushButton[styleSheetClass="primary"]:hover {
+    background-color: #059669;
+}
+
+/* Danger Buttons */
+QPushButton#dangerButton {
+    background-color: #ef4444;
+    color: #ffffff;
+    border: none;
+}
+
+QPushButton#dangerButton:hover {
+    background-color: #dc2626;
+}
+
+/* Input Fields */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #0f172a;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 2px solid #0ea5e9;
+    background-color: #ffffff;
+}
+
+/* Group Boxes / Cards */
+QGroupBox {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-top: 15px;
+    font-weight: bold;
+    color: #0ea5e9;
+    background-color: #ffffff;
+    padding-top: 15px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top right;
+    padding: 0 10px;
+}
+
+/* Tables */
+QTableWidget {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    gridline-color: #f1f5f9;
+    color: #1f2937;
+}
+
+QHeaderView::section {
+    background-color: #f8fafc;
+    padding: 10px;
+    border: none;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: bold;
+    color: #64748b;
+}
+
+QTableWidget::item:selected {
+    background-color: #38bdf8;
+    color: #ffffff;
+}
+
+/* Tabs */
+QTabWidget::panel {
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+QTabBar::tab {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 8px 16px;
+    color: #64748b;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #0ea5e9;
+    border-bottom: 2px solid #0ea5e9;
+}
+
+/* Login Box Custom Styles */
+QWidget#loginBox {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+QLabel#loginTitle {
+    color: #0ea5e9;
+}

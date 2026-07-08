@@ -42,6 +42,7 @@ class Product(Base):
     parent_id = Column(Integer, ForeignKey('products.id'), nullable=True)
     units_in_box = Column(Integer, default=1) # عدد القطع داخل العلبة
     
+    barcode = Column(String(50), unique=True, nullable=True) # الباركود الأساسي
     barcodes = relationship("ProductBarcode", back_populates="product", cascade="all, delete-orphan")
 
 class ProductBarcode(Base):

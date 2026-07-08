@@ -221,8 +221,11 @@ class ProductSearchDialog(QDialog):
         query = self.search_input.text().strip()
         
         session = get_session()
-        products = session.query(Product).filter(
-            (Product.name.like(f"%{query}%")) | (Product.barcode.like(f"%{query}%"))
+        from database import ProductBarcode
+        products = session.query(Product).join(Product.barcodes, isouter=True).filter(
+            (Product.name.like(f"%{query}%")) | 
+            (Product.barcode.like(f"%{query}%")) | 
+            (ProductBarcode.barcode.like(f"%{query}%"))
         ).all()
         session.close()
         

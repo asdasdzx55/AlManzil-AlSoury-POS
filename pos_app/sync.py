@@ -45,15 +45,35 @@ def sync_products_from_online():
                 online_products = res_data.get('products', [])
                 
                 session = get_session()
+                from database import Subcategory, Category
+                
+                # جلب أو إنشاء تصنيف فرعي افتراضي لتلبية قيود NOT NULL في قاعدة البيانات المحلية
+                default_sub = session.query(Subcategory).first()
+                if not default_sub:
+                    default_cat = session.query(Category).first()
+                    if not default_cat:
+                        default_cat = Category(name="المواد الغذائية")
+                        session.add(default_cat)
+                        session.commit()
+                    default_sub = Subcategory(name="عام", category_id=default_cat.id)
+                    session.add(default_sub)
+                    session.commit()
+                
                 for op in online_products:
                     # check if product exists locally
                     local_p = session.query(Product).filter_by(barcode=op['barcode']).first()
                     if local_p:
                         local_p.name = op['name']
                         local_p.price = float(op['price'])
-                        local_p.quantity = int(op['quantity'])
+                        local_p.quantity = float(op['quantity'])
                     else:
-                        new_p = Product(barcode=op['barcode'], name=op['name'], price=float(op['price']), quantity=int(op['quantity']))
+                        new_p = Product(
+                            barcode=op['barcode'], 
+                            name=op['name'], 
+                            price=float(op['price']), 
+                            quantity=float(op['quantity']),
+                            subcategory_id=default_sub.id
+                        )
                         session.add(new_p)
                 session.commit()
                 session.close()
