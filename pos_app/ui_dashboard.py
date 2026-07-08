@@ -46,16 +46,22 @@ class DashboardWindow(QWidget):
         self.btn_pos.clicked.connect(lambda: self.switch_page(0))
         sidebar_layout.addWidget(self.btn_pos)
         
+        self.btn_purchases = QPushButton("📥")
+        self.btn_purchases.setToolTip("فاتورة المشتريات والتوريد")
+        self.btn_purchases.setCheckable(True)
+        self.btn_purchases.clicked.connect(lambda: self.switch_page(1))
+        sidebar_layout.addWidget(self.btn_purchases)
+        
         self.btn_inventory = QPushButton("📦")
         self.btn_inventory.setToolTip("إدارة الأصناف")
         self.btn_inventory.setCheckable(True)
-        self.btn_inventory.clicked.connect(lambda: self.switch_page(1))
+        self.btn_inventory.clicked.connect(lambda: self.switch_page(2))
         sidebar_layout.addWidget(self.btn_inventory)
         
         self.btn_suppliers = QPushButton("👥")
         self.btn_suppliers.setToolTip("إدارة الموردين")
         self.btn_suppliers.setCheckable(True)
-        self.btn_suppliers.clicked.connect(lambda: self.switch_page(2))
+        self.btn_suppliers.clicked.connect(lambda: self.switch_page(3))
         sidebar_layout.addWidget(self.btn_suppliers)
         
         self.btn_reports = QPushButton("📈")
@@ -65,13 +71,13 @@ class DashboardWindow(QWidget):
             self.btn_reports.setEnabled(False)
             self.btn_reports.setToolTip("هذه الصفحة متاحة للمدير فقط")
             self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 24px;")
-        self.btn_reports.clicked.connect(lambda: self.switch_page(3))
+        self.btn_reports.clicked.connect(lambda: self.switch_page(4))
         sidebar_layout.addWidget(self.btn_reports)
         
         self.btn_sync = QPushButton("🔄")
         self.btn_sync.setToolTip("المزامنة السحابية")
         self.btn_sync.setCheckable(True)
-        self.btn_sync.clicked.connect(lambda: self.switch_page(4))
+        self.btn_sync.clicked.connect(lambda: self.switch_page(5))
         sidebar_layout.addWidget(self.btn_sync)
         
         sidebar_layout.addStretch()
@@ -89,19 +95,21 @@ class DashboardWindow(QWidget):
         btn_logout.clicked.connect(self.on_logout)
         sidebar_layout.addWidget(btn_logout)
         
-        self.menu_buttons = [self.btn_pos, self.btn_inventory, self.btn_suppliers, self.btn_reports, self.btn_sync]
+        self.menu_buttons = [self.btn_pos, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_reports, self.btn_sync]
         
         # 2. حاوي الصفحات الرئيسي (مستجيب وقابل للتمدد)
         self.container = QStackedWidget()
         self.container.setStyleSheet("padding: 15px;")
         
         self.page_pos = POSPage(self.user)
+        self.page_purchases = PurchasesPage()
         self.page_inventory = InventoryPage()
         self.page_suppliers = SuppliersPage()
         self.page_reports = ReportsPage()
         self.page_sync = SyncPage()
         
         self.container.addWidget(self.page_pos)
+        self.container.addWidget(self.page_purchases)
         self.container.addWidget(self.page_inventory)
         self.container.addWidget(self.page_suppliers)
         self.container.addWidget(self.page_reports)
@@ -119,10 +127,12 @@ class DashboardWindow(QWidget):
         self.container.setCurrentIndex(index)
         
         if index == 1:
-            self.page_inventory.load_products()
+            self.page_purchases.load_suppliers()
         elif index == 2:
-            self.page_suppliers.load_suppliers()
+            self.page_inventory.load_products()
         elif index == 3:
+            self.page_suppliers.load_suppliers()
+        elif index == 4:
             self.page_reports.load_reports()
 
     def toggle_theme(self):
@@ -587,6 +597,415 @@ class POSPage(QWidget):
         except Exception as e:
             session.rollback()
             QMessageBox.critical(self, "خطأ", f"فشل إتمام العملية: {str(e)}")
+        finally:
+            session.close()
+
+
+# ==================== QUICK PRODUCT DIALOG (FLOATING) ====================
+class QuickProductDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("إضافة/تعديل صنف سريع")
+        self.resize(450, 400)
+        self.init_ui()
+
+    def init_ui(self):
+        form_layout = QFormLayout()
+        
+        self.input_barcode = QLineEdit()
+        self.input_barcode.setPlaceholderText("أدخل الباركود الرئيسي...")
+        
+        self.input_name = QLineEdit()
+        self.input_name.setPlaceholderText("اسم المنتج...")
+        
+        self.input_cost = QDoubleSpinBox()
+        self.input_cost.setMaximum(999999.0)
+        self.input_cost.setPrefix("سعر الشراء: ")
+        
+        self.input_price = QDoubleSpinBox()
+        self.input_price.setMaximum(999999.0)
+        self.input_price.setPrefix("سعر البيع: ")
+        
+        self.combo_subcat = QComboBox()
+        self.load_subcategories()
+        
+        self.check_weighted = QCheckBox("هذا الصنف بالوزن / جرامات")
+        
+        form_layout.addRow("الباركود:", self.input_barcode)
+        form_layout.addRow("اسم المنتج:", self.input_name)
+        form_layout.addRow("سعر التكلفة:", self.input_cost)
+        form_layout.addRow("سعر البيع:", self.input_price)
+        form_layout.addRow("التصنيف الفرعي:", self.combo_subcat)
+        form_layout.addRow("", self.check_weighted)
+        
+        # ربط زر إنتر بالانتقال للخانة التالية لتسريع الإدخال
+        self.input_barcode.returnPressed.connect(self.focusNextChild)
+        self.input_name.returnPressed.connect(self.focusNextChild)
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.save_product)
+        buttons.rejected.connect(self.reject)
+        
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(form_layout)
+        main_layout.addWidget(buttons)
+        self.setLayout(main_layout)
+        
+        # ربط الباركود بحدث تغيير النص للبحث التلقائي وتحميل البيانات للتعديل السريع
+        self.input_barcode.textChanged.connect(self.check_existing_barcode)
+
+    def load_subcategories(self):
+        session = get_session()
+        from database import Subcategory
+        subcats = session.query(Subcategory).all()
+        for sc in subcats:
+            self.combo_subcat.addItem(f"{sc.category.name} -> {sc.name}", sc.id)
+        session.close()
+
+    def check_existing_barcode(self, text):
+        barcode = text.strip()
+        if not barcode:
+            return
+            
+        session = get_session()
+        from database import ProductBarcode
+        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+        if entry:
+            prod = entry.product
+            self.input_name.setText(prod.name)
+            self.input_cost.setValue(prod.cost_price if prod.cost_price else 0.0)
+            self.input_price.setValue(prod.price)
+            self.check_weighted.setChecked(prod.is_weighted)
+            idx = self.combo_subcat.findData(prod.subcategory_id)
+            if idx >= 0:
+                self.combo_subcat.setCurrentIndex(idx)
+        session.close()
+
+    def save_product(self):
+        barcode = self.input_barcode.text().strip()
+        name = self.input_name.text().strip()
+        cost = self.input_cost.value()
+        price = self.input_price.value()
+        is_weighted = self.check_weighted.isChecked()
+        subcat_id = self.combo_subcat.currentData()
+        
+        if not barcode or not name or not subcat_id:
+            QMessageBox.warning(self, "تنبيه", "يرجى تعبئة جميع الحقول المطلوبة")
+            return
+            
+        session = get_session()
+        from database import ProductBarcode
+        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+        if entry:
+            prod = entry.product
+            prod.name = name
+            prod.cost_price = cost
+            prod.price = price
+            prod.is_weighted = is_weighted
+            prod.subcategory_id = subcat_id
+        else:
+            prod = Product(name=name, price=price, cost_price=cost, quantity=0.0, is_weighted=is_weighted, subcategory_id=subcat_id)
+            session.add(prod)
+            session.commit()
+            
+            new_bc = ProductBarcode(product_id=prod.id, barcode=barcode)
+            session.add(new_bc)
+            
+        session.commit()
+        session.close()
+        QMessageBox.information(self, "نجاح", "تم حفظ المنتج بنجاح!")
+        self.accept()
+
+    def keyPressEvent(self, event):
+        # منع إغلاق الديالوج بإنتر والانتقال للخانة التالية
+        if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+            focused = self.focusWidget()
+            if not isinstance(focused, QPushButton):
+                self.focusNextChild()
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
+
+# ==================== PURCHASES PAGE ====================
+class PurchasesPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.cart = {}
+        self.init_ui()
+        self.setup_shortcuts()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # العنوان والبحث العلوي والسريع
+        top_widget = QWidget()
+        top_layout = QHBoxLayout(top_widget)
+        
+        header = QLabel("📥 فاتورة شراء وتوريد جديدة")
+        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;")
+        
+        self.barcode_input = QLineEdit()
+        self.barcode_input.setPlaceholderText("أدخل الباركود أو امسح بالجهاز للبدء... (F1)")
+        self.barcode_input.returnPressed.connect(self.add_by_barcode)
+        
+        btn_search = QPushButton("🔍 بحث")
+        btn_search.clicked.connect(self.open_search_dialog)
+        
+        btn_quick_add = QPushButton("➕ إضافة/تعديل صنف سريع (F6)")
+        btn_quick_add.clicked.connect(self.open_quick_add_dialog)
+        btn_quick_add.setStyleSheet("background-color: #2c3e50; color: white;")
+        
+        top_layout.addWidget(header, 2)
+        top_layout.addWidget(self.barcode_input, 4)
+        top_layout.addWidget(btn_search, 1)
+        top_layout.addWidget(btn_quick_add, 2)
+        layout.addWidget(top_widget)
+        
+        # جدول المنتجات بمنتصف الشاشة
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر الشراء (التكلفة)", "الكمية المشتراة", "البونص (الهدايا)", "الإجمالي"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.cellChanged.connect(self.on_cell_changed)
+        layout.addWidget(self.table)
+        
+        # الشريط السفلي (المورد، نوع الدفع، رصيد المورد، الإجمالي)
+        bottom_layout = QHBoxLayout()
+        
+        # مجموعة المورد
+        sup_group = QGroupBox("بيانات المورد")
+        sup_layout = QHBoxLayout(sup_group)
+        self.combo_supplier = QComboBox()
+        self.combo_supplier.addItem("لا شيء (مشتريات بدون مورد)", None)
+        self.load_suppliers()
+        self.combo_supplier.currentIndexChanged.connect(self.on_supplier_changed)
+        
+        # صندوق عرض الرصيد قبل الفاتورة
+        self.lbl_supplier_balance = QLabel("الرصيد المستحق قبل الفاتورة: 0.00 ل.س")
+        self.lbl_supplier_balance.setStyleSheet("font-weight: bold; color: #e74c3c;")
+        
+        sup_layout.addWidget(self.combo_supplier)
+        sup_layout.addWidget(self.lbl_supplier_balance)
+        
+        # مجموعة الدفع
+        pay_group = QGroupBox("طريقة الدفع")
+        pay_layout = QHBoxLayout(pay_group)
+        self.combo_pay_type = QComboBox()
+        self.combo_pay_type.addItems(["نقدي", "آجل (دين للمورد)"])
+        pay_layout.addWidget(self.combo_pay_type)
+        
+        # مجموعة الإجمالي والحفظ
+        sum_group = QGroupBox("ملخص الشراء")
+        sum_layout = QVBoxLayout(sum_group)
+        self.total_label = QLabel("إجمالي الفاتورة: 0.00 ل.س")
+        self.total_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71;")
+        
+        btn_save = QPushButton("💾 حفظ وتأكيد فاتورة الشراء (F5)")
+        btn_save.setProperty("styleSheetClass", "primary")
+        btn_save.clicked.connect(self.checkout_purchase)
+        
+        sum_layout.addWidget(self.total_label)
+        sum_layout.addWidget(btn_save)
+        
+        bottom_layout.addWidget(sup_group, 4)
+        bottom_layout.addWidget(pay_group, 2)
+        bottom_layout.addWidget(sum_group, 3)
+        
+        layout.addLayout(bottom_layout)
+        self.setLayout(layout)
+
+    def setup_shortcuts(self):
+        self.sh_focus = QShortcut(QKeySequence("F1"), self)
+        self.sh_focus.activated.connect(self.barcode_input.setFocus)
+        
+        self.sh_quick = QShortcut(QKeySequence("F6"), self)
+        self.sh_quick.activated.connect(self.open_quick_add_dialog)
+        
+        self.sh_save = QShortcut(QKeySequence("F5"), self)
+        self.sh_save.activated.connect(self.checkout_purchase)
+
+    def load_suppliers(self):
+        curr_idx = self.combo_supplier.currentIndex()
+        self.combo_supplier.clear()
+        self.combo_supplier.addItem("لا شيء (مشتريات بدون مورد)", None)
+        
+        session = get_session()
+        suppliers = session.query(Supplier).all()
+        session.close()
+        for sup in suppliers:
+            self.combo_supplier.addItem(f"{sup.name} ({sup.phone if sup.phone else ''})", sup.id)
+            
+        if curr_idx >= 0 and curr_idx < self.combo_supplier.count():
+            self.combo_supplier.setCurrentIndex(curr_idx)
+
+    def on_supplier_changed(self):
+        supplier_id = self.combo_supplier.currentData()
+        if not supplier_id:
+            self.lbl_supplier_balance.setText("الرصيد المستحق قبل الفاتورة: 0.00 ل.س")
+            return
+            
+        session = get_session()
+        sup = session.query(Supplier).get(supplier_id)
+        if sup:
+            self.lbl_supplier_balance.setText(f"الرصيد المستحق قبل الفاتورة: {sup.balance:.2f} ل.س")
+        session.close()
+
+    def open_search_dialog(self):
+        dialog = ProductSearchDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if dialog.selected_barcode:
+                self.barcode_input.setText(dialog.selected_barcode)
+                self.add_by_barcode()
+
+    def open_quick_add_dialog(self):
+        dialog = QuickProductDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            pass
+
+    def add_by_barcode(self):
+        barcode = self.barcode_input.text().strip()
+        if not barcode:
+            return
+            
+        session = get_session()
+        from database import ProductBarcode
+        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+        product = None
+        if entry:
+            product = entry.product
+        else:
+            product = session.query(Product).filter_by(name=barcode).first()
+            
+        if product:
+            cart_key = f"prod_{product.id}"
+            if cart_key in self.cart:
+                self.cart[cart_key]['qty'] += 1.0
+            else:
+                self.cart[cart_key] = {
+                    'id': product.id,
+                    'name': product.name,
+                    'cost_price': product.cost_price if product.cost_price else 0.0,
+                    'qty': 1.0,
+                    'bonus': 0.0,
+                    'is_weighted': product.is_weighted,
+                    'barcode': barcode
+                }
+            self.barcode_input.clear()
+            self.update_table()
+        else:
+            # لو لم يجد، يفتح نافذة الإضافة السريعة ويعبئ الباركود تلقائياً
+            dialog = QuickProductDialog(self)
+            dialog.input_barcode.setText(barcode)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.add_by_barcode()
+        session.close()
+
+    def update_table(self):
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        total = 0.0
+        for key, item in self.cart.items():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            
+            subtotal = item['cost_price'] * item['qty']
+            total += subtotal
+            
+            b_item = QTableWidgetItem(item['barcode'])
+            b_item.setFlags(b_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            n_item = QTableWidgetItem(item['name'])
+            n_item.setFlags(n_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            c_item = QTableWidgetItem(f"{item['cost_price']:.2f}")
+            
+            qty_str = f"{item['qty']:.3f}" if item['is_weighted'] else str(int(item['qty']))
+            q_item = QTableWidgetItem(qty_str)
+            
+            bon_str = f"{item['bonus']:.3f}" if item['is_weighted'] else str(int(item['bonus']))
+            bon_item = QTableWidgetItem(bon_str)
+            
+            s_item = QTableWidgetItem(f"{subtotal:.2f}")
+            s_item.setFlags(s_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            self.table.setItem(row, 0, b_item)
+            self.table.setItem(row, 1, n_item)
+            self.table.setItem(row, 2, c_item)
+            self.table.setItem(row, 3, q_item)
+            self.table.setItem(row, 4, bon_item)
+            self.table.setItem(row, 5, s_item)
+            
+        self.total_label.setText(f"إجمالي الفاتورة: {total:.2f} ل.س")
+        self.table.blockSignals(False)
+
+    def on_cell_changed(self, row, column):
+        self.table.blockSignals(True)
+        barcode = self.table.item(row, 0).text()
+        
+        target_item = None
+        for key, item in self.cart.items():
+            if item['barcode'] == barcode:
+                target_item = item
+                break
+                
+        if not target_item:
+            self.table.blockSignals(False)
+            return
+            
+        if column == 2: # سعر الشراء
+            try:
+                target_item['cost_price'] = float(self.table.item(row, column).text())
+            except ValueError:
+                pass
+        elif column == 3: # الكمية
+            try:
+                target_item['qty'] = float(self.table.item(row, column).text())
+            except ValueError:
+                pass
+        elif column == 4: # البونص
+            try:
+                target_item['bonus'] = float(self.table.item(row, column).text())
+            except ValueError:
+                pass
+                
+        self.table.blockSignals(False)
+        self.update_table()
+
+    def checkout_purchase(self):
+        if not self.cart:
+            QMessageBox.warning(self, "الفاتورة فارغة", "الرجاء إضافة أصناف أولاً")
+            return
+            
+        total = sum(item['cost_price'] * item['qty'] for item in self.cart.values())
+        supplier_id = self.combo_supplier.currentData()
+        pay_type = self.combo_pay_type.currentText()
+        
+        session = get_session()
+        try:
+            for key, item in self.cart.items():
+                prod = session.query(Product).get(item['id'])
+                if prod:
+                    prod.quantity += (item['qty'] + item['bonus'])
+                    prod.cost_price = item['cost_price']
+            
+            if pay_type == "آجل (دين للمورد)" and supplier_id:
+                sup = session.query(Supplier).get(supplier_id)
+                if sup:
+                    sup.balance += total
+                    
+                    from database import SupplierTransaction
+                    tx = SupplierTransaction(supplier_id=supplier_id, amount=total, type="purchase_in", note="شراء بضاعة بالآجل - فاتورة شراء")
+                    session.add(tx)
+                    
+            session.commit()
+            QMessageBox.information(self, "تم الحفظ", "تم حفظ الفاتورة وتحديث المخازن والديون بنجاح!")
+            self.cart.clear()
+            self.update_table()
+            self.on_supplier_changed()
+        except Exception as e:
+            session.rollback()
+            QMessageBox.critical(self, "خطأ", f"فشل حفظ الفاتورة: {str(e)}")
         finally:
             session.close()
 

@@ -30,6 +30,7 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
     price = Column(Float, nullable=False)
+    cost_price = Column(Float, default=0.0) # سعر التكلفة الشراء
     quantity = Column(Float, default=0.0) # الكمية المتاحة
     is_weighted = Column(Boolean, default=False) # هل بالوزن؟
     
@@ -74,7 +75,7 @@ engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT id FROM product_barcodes LIMIT 1"))
+        conn.execute(text("SELECT cost_price FROM products LIMIT 1"))
 except Exception:
     # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)
