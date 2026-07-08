@@ -15,18 +15,40 @@ class Category(Base):
     __tablename__ = 'categories'
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
-    products = relationship("Product", back_populates="category")
+    subcategories = relationship("Subcategory", back_populates="category", cascade="all, delete-orphan")
+
+class Subcategory(Base):
+    __tablename__ = 'subcategories'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)
+    category = relationship("Category", back_populates="subcategories")
+    products = relationship("Product", back_populates="subcategory")
 
 class Product(Base):
     __tablename__ = 'products'
     id = Column(Integer, primary_key=True)
-    barcode = Column(String(50), unique=True, nullable=False)
     name = Column(String(100), nullable=False)
     price = Column(Float, nullable=False)
-    quantity = Column(Float, default=0.0) # يدعم الكسور للوزن
-    is_weighted = Column(Boolean, default=False) # هل المنتج يباع بالوزن؟
-    category_id = Column(Integer, ForeignKey('categories.id'))
-    category = relationship("Category", back_populates="products")
+    quantity = Column(Float, default=0.0) # الكمية المتاحة
+    is_weighted = Column(Boolean, default=False) # هل بالوزن؟
+    
+    # علاقة التصنيف الفرعي (إجباري)
+    subcategory_id = Column(Integer, ForeignKey('subcategories.id'), nullable=False)
+    subcategory = relationship("Subcategory", back_populates="products")
+    
+    # علاقة العلبة بالمنتج الفردي (علبة تحتوي على عدد قطع من منتج أب)
+    parent_id = Column(Integer, ForeignKey('products.id'), nullable=True)
+    units_in_box = Column(Integer, default=1) # عدد القطع داخل العلبة
+    
+    barcodes = relationship("ProductBarcode", back_populates="product", cascade="all, delete-orphan")
+
+class ProductBarcode(Base):
+    __tablename__ = 'product_barcodes'
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
+    barcode = Column(String(50), unique=True, nullable=False)
+    product = relationship("Product", back_populates="barcodes")
 
 class Supplier(Base):
     __tablename__ = 'suppliers'
@@ -52,9 +74,9 @@ engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT id FROM supplier_transactions LIMIT 1"))
+        conn.execute(text("SELECT id FROM product_barcodes LIMIT 1"))
 except Exception:
-    # في حال لم يكن جدول الحركات موجوداً، نقوم بحذف الجداول وإعادة إنشائها بالبنية الجديدة
+    # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)
 
 Base.metadata.create_all(engine)
@@ -64,13 +86,22 @@ SessionLocal = sessionmaker(bind=engine)
 def get_session():
     return SessionLocal()
 
-# Seed default admin user if none exists
-def seed_admin():
+# Seed default admin user and default categories/subcategories if empty
+def seed_initial_data():
     session = get_session()
     if session.query(User).count() == 0:
         admin = User(username='admin', password='123', role='admin')
         session.add(admin)
         session.commit()
+        
+    if session.query(Category).count() == 0:
+        cat1 = Category(name="المواد الغذائية")
+        session.add(cat1)
+        session.commit()
+        
+        sub1 = Subcategory(name="الأرز والمعلبات", category_id=cat1.id)
+        session.add(sub1)
+        session.commit()
     session.close()
 
-seed_admin()
+seed_initial_data()

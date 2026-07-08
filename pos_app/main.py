@@ -24,7 +24,10 @@ class MainWindow(QMainWindow):
         self.load_stylesheet()
 
     def load_stylesheet(self):
-        style_path = os.path.join(os.path.dirname(__file__), "styles.qss")
+        style_path = os.path.join(os.path.dirname(__file__), "styles_dark.qss")
+        if not os.path.exists(style_path):
+            style_path = os.path.join(os.path.dirname(__file__), "styles.qss")
+            
         if os.path.exists(style_path):
             with open(style_path, "r", encoding="utf-8") as f:
                 self.setStyleSheet(f.read())
