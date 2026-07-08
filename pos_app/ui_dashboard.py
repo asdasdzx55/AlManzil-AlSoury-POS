@@ -46,28 +46,34 @@ class DashboardWindow(QWidget):
         self.btn_pos.clicked.connect(lambda: self.switch_page(0))
         sidebar_layout.addWidget(self.btn_pos)
         
+        self.btn_returns = QPushButton("↩️")
+        self.btn_returns.setToolTip("مرتجع المبيعات")
+        self.btn_returns.setCheckable(True)
+        self.btn_returns.clicked.connect(lambda: self.switch_page(1))
+        sidebar_layout.addWidget(self.btn_returns)
+        
         self.btn_purchases = QPushButton("📥")
         self.btn_purchases.setToolTip("فاتورة المشتريات والتوريد")
         self.btn_purchases.setCheckable(True)
-        self.btn_purchases.clicked.connect(lambda: self.switch_page(1))
+        self.btn_purchases.clicked.connect(lambda: self.switch_page(2))
         sidebar_layout.addWidget(self.btn_purchases)
         
         self.btn_inventory = QPushButton("📦")
         self.btn_inventory.setToolTip("إدارة الأصناف")
         self.btn_inventory.setCheckable(True)
-        self.btn_inventory.clicked.connect(lambda: self.switch_page(2))
+        self.btn_inventory.clicked.connect(lambda: self.switch_page(3))
         sidebar_layout.addWidget(self.btn_inventory)
         
         self.btn_suppliers = QPushButton("👥")
         self.btn_suppliers.setToolTip("إدارة الموردين")
         self.btn_suppliers.setCheckable(True)
-        self.btn_suppliers.clicked.connect(lambda: self.switch_page(3))
+        self.btn_suppliers.clicked.connect(lambda: self.switch_page(4))
         sidebar_layout.addWidget(self.btn_suppliers)
         
         self.btn_hr = QPushButton("👤")
         self.btn_hr.setToolTip("إدارة شؤون الموظفين والرواتب (HR)")
         self.btn_hr.setCheckable(True)
-        self.btn_hr.clicked.connect(lambda: self.switch_page(4))
+        self.btn_hr.clicked.connect(lambda: self.switch_page(5))
         sidebar_layout.addWidget(self.btn_hr)
         
         self.btn_reports = QPushButton("📈")
@@ -77,13 +83,13 @@ class DashboardWindow(QWidget):
             self.btn_reports.setEnabled(False)
             self.btn_reports.setToolTip("هذه الصفحة متاحة للمدير فقط")
             self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 24px;")
-        self.btn_reports.clicked.connect(lambda: self.switch_page(5))
+        self.btn_reports.clicked.connect(lambda: self.switch_page(6))
         sidebar_layout.addWidget(self.btn_reports)
         
         self.btn_sync = QPushButton("🔄")
         self.btn_sync.setToolTip("المزامنة السحابية")
         self.btn_sync.setCheckable(True)
-        self.btn_sync.clicked.connect(lambda: self.switch_page(6))
+        self.btn_sync.clicked.connect(lambda: self.switch_page(7))
         sidebar_layout.addWidget(self.btn_sync)
         
         sidebar_layout.addStretch()
@@ -101,13 +107,14 @@ class DashboardWindow(QWidget):
         btn_logout.clicked.connect(self.on_logout)
         sidebar_layout.addWidget(btn_logout)
         
-        self.menu_buttons = [self.btn_pos, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_hr, self.btn_reports, self.btn_sync]
+        self.menu_buttons = [self.btn_pos, self.btn_returns, self.btn_purchases, self.btn_inventory, self.btn_suppliers, self.btn_hr, self.btn_reports, self.btn_sync]
         
         # 2. حاوي الصفحات الرئيسي (مستجيب وقابل للتمدد)
         self.container = QStackedWidget()
         self.container.setStyleSheet("padding: 15px;")
         
         self.page_pos = POSPage(self.user)
+        self.page_returns = ReturnsPage()
         self.page_purchases = PurchasesPage()
         self.page_inventory = InventoryPage()
         self.page_suppliers = SuppliersPage()
@@ -116,6 +123,7 @@ class DashboardWindow(QWidget):
         self.page_sync = SyncPage()
         
         self.container.addWidget(self.page_pos)
+        self.container.addWidget(self.page_returns)
         self.container.addWidget(self.page_purchases)
         self.container.addWidget(self.page_inventory)
         self.container.addWidget(self.page_suppliers)
@@ -137,14 +145,16 @@ class DashboardWindow(QWidget):
         if index == 0:
             self.page_pos.load_delivery_employees()
         elif index == 1:
-            self.page_purchases.load_suppliers()
+            self.page_returns.clear_page()
         elif index == 2:
-            self.page_inventory.load_products()
+            self.page_purchases.load_suppliers()
         elif index == 3:
-            self.page_suppliers.load_suppliers()
+            self.page_inventory.load_products()
         elif index == 4:
-            self.page_hr.load_employees()
+            self.page_suppliers.load_suppliers()
         elif index == 5:
+            self.page_hr.load_employees()
+        elif index == 6:
             self.page_reports.load_reports()
 
     def toggle_theme(self):
@@ -2680,3 +2690,287 @@ class HRPage(QWidget):
         self.input_trans_amount.setValue(0.0)
         self.input_trans_note.clear()
         self.load_transactions()
+
+
+# ==================== INVOICE ARCHIVE DIALOG ====================
+class InvoiceArchiveDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("أرشيف فواتير المبيعات 📜")
+        self.resize(700, 500)
+        self.selected_invoice_id = None
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        search_layout = QHBoxLayout()
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("ابحث برقم الفاتورة أو اسم العميل...")
+        self.search_input.textChanged.connect(self.load_invoices)
+        search_layout.addWidget(self.search_input)
+        layout.addLayout(search_layout)
+        
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["رقم الفاتورة", "التاريخ والوقت", "العميل", "طريقة الدفع", "الإجمالي"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.doubleClicked.connect(self.select_invoice)
+        layout.addWidget(self.table)
+        
+        btn_layout = QHBoxLayout()
+        btn_select = QPushButton("تحميل الفاتورة للمرتجع ↩️")
+        btn_select.clicked.connect(self.select_invoice)
+        btn_select.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold;")
+        
+        btn_cancel = QPushButton("إغلاق")
+        btn_cancel.clicked.connect(self.reject)
+        
+        btn_layout.addWidget(btn_select)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+        
+        self.setLayout(layout)
+        self.load_invoices()
+
+    def load_invoices(self):
+        self.table.setRowCount(0)
+        search_txt = self.search_input.text().strip()
+        
+        session = get_session()
+        from database import Invoice
+        query = session.query(Invoice)
+        if search_txt:
+            if search_txt.isdigit():
+                query = query.filter(Invoice.id == int(search_txt))
+            else:
+                query = query.filter(Invoice.customer_name.like(f"%{search_txt}%"))
+                
+        invoices = query.order_by(Invoice.date.desc()).all()
+        
+        for inv in invoices:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(f"#{inv.id}"))
+            self.table.setItem(row, 1, QTableWidgetItem(inv.date.strftime("%Y-%m-%d %H:%M")))
+            self.table.setItem(row, 2, QTableWidgetItem(inv.customer_name if inv.customer_name else "عميل سفري"))
+            self.table.setItem(row, 3, QTableWidgetItem(inv.payment_method))
+            self.table.setItem(row, 4, QTableWidgetItem(f"{inv.total:.2f}"))
+            
+        session.close()
+
+    def select_invoice(self):
+        row = self.table.currentRow()
+        if row >= 0:
+            inv_id_txt = self.table.item(row, 0).text()
+            self.selected_invoice_id = int(inv_id_txt.replace("#", ""))
+            self.accept()
+        else:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار فاتورة من الجدول أولاً")
+
+
+# ==================== RETURNS PAGE ====================
+class ReturnsPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.return_items = {}
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        header = QLabel("↩️ مرتجع المبيعات")
+        header.setStyleSheet("font-size: 22px; font-weight: bold; color: #c0392b; margin-bottom: 10px;")
+        layout.addWidget(header)
+        
+        top_bar = QHBoxLayout()
+        self.barcode_input = QLineEdit()
+        self.barcode_input.setPlaceholderText("امسح باركود المنتج لإرجاعه أو اكتب اسمه...")
+        self.barcode_input.setMinimumHeight(40)
+        self.barcode_input.setStyleSheet("font-size: 16px;")
+        self.barcode_input.returnPressed.connect(self.handle_barcode_search)
+        
+        btn_search = QPushButton("بحث 🔍")
+        btn_search.clicked.connect(self.handle_barcode_search)
+        btn_search.setMinimumHeight(40)
+        
+        btn_archive = QPushButton("أرشيف الفواتير 📜")
+        btn_archive.clicked.connect(self.open_invoice_archive)
+        btn_archive.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold;")
+        btn_archive.setMinimumHeight(40)
+        
+        top_bar.addWidget(self.barcode_input, 4)
+        top_bar.addWidget(btn_search, 1)
+        top_bar.addWidget(btn_archive, 2)
+        layout.addLayout(top_bar)
+        
+        self.table = QTableWidget()
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "الكمية المرتجعة", "الإجمالي"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.cellChanged.connect(self.handle_cell_changed)
+        layout.addWidget(self.table)
+        
+        bottom_bar = QHBoxLayout()
+        self.lbl_refund = QLabel("إجمالي المبلغ المسترجع: 0.00 ل.س")
+        self.lbl_refund.setStyleSheet("font-size: 18px; font-weight: bold; color: #c0392b;")
+        
+        btn_confirm = QPushButton("تأكيد المرتجع وإرجاع المال 🔄")
+        btn_confirm.clicked.connect(self.confirm_return)
+        btn_confirm.setStyleSheet("background-color: #e74c3c; color: white; font-size: 16px; font-weight: bold; padding: 10px 20px;")
+        
+        btn_clear = QPushButton("تنظيف 🧹")
+        btn_clear.clicked.connect(self.clear_page)
+        
+        bottom_bar.addWidget(self.lbl_refund)
+        bottom_bar.addStretch()
+        bottom_bar.addWidget(btn_clear)
+        bottom_bar.addWidget(btn_confirm)
+        layout.addLayout(bottom_bar)
+        
+        self.setLayout(layout)
+
+    def handle_barcode_search(self):
+        txt = self.barcode_input.text().strip()
+        if not txt:
+            return
+            
+        session = get_session()
+        from database import Product, ProductBarcode
+        
+        prod = session.query(Product).filter_by(barcode=txt).first()
+        if not prod:
+            sub_bar = session.query(ProductBarcode).filter_by(barcode=txt).first()
+            if sub_bar:
+                prod = sub_bar.product
+                
+        if not prod:
+            prod = session.query(Product).filter(Product.name.like(f"%{txt}%")).first()
+            
+        if prod:
+            barcode = prod.barcode if prod.barcode else str(prod.id)
+            if barcode in self.return_items:
+                self.return_items[barcode]['qty_to_return'] += 1
+            else:
+                self.return_items[barcode] = {
+                    'id': prod.id,
+                    'name': prod.name,
+                    'price': prod.price,
+                    'qty_to_return': 1.0,
+                    'max_qty': 99999.0
+                }
+            self.update_table()
+            self.barcode_input.clear()
+        else:
+            QMessageBox.warning(self, "غير موجود", "لم يتم العثور على المنتج المطلوب")
+            
+        session.close()
+
+    def open_invoice_archive(self):
+        dialog = InvoiceArchiveDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            inv_id = dialog.selected_invoice_id
+            if inv_id:
+                self.load_invoice_to_return(inv_id)
+
+    def load_invoice_to_return(self, invoice_id):
+        self.clear_page()
+        session = get_session()
+        from database import Invoice
+        inv = session.query(Invoice).get(invoice_id)
+        if inv:
+            for item in inv.items:
+                barcode = item.product.barcode if item.product.barcode else str(item.product.id)
+                self.return_items[barcode] = {
+                    'id': item.product.id,
+                    'name': item.product.name,
+                    'price': item.price,
+                    'qty_to_return': item.quantity,
+                    'max_qty': item.quantity
+                }
+            self.update_table()
+        session.close()
+
+    def update_table(self):
+        self.table.blockSignals(True)
+        self.table.setRowCount(0)
+        
+        for barcode, item in self.return_items.items():
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(barcode))
+            self.table.item(row, 0).setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            
+            self.table.setItem(row, 1, QTableWidgetItem(item['name']))
+            self.table.item(row, 1).setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            
+            self.table.setItem(row, 2, QTableWidgetItem(f"{item['price']:.2f}"))
+            self.table.item(row, 2).setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            
+            self.table.setItem(row, 3, QTableWidgetItem(str(item['qty_to_return'])))
+            
+            subtotal = item['price'] * item['qty_to_return']
+            self.table.setItem(row, 4, QTableWidgetItem(f"{subtotal:.2f}"))
+            self.table.item(row, 4).setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            
+        self.table.blockSignals(False)
+        self.calculate_total()
+
+    def handle_cell_changed(self, row, col):
+        if col == 3:
+            barcode = self.table.item(row, 0).text()
+            qty_txt = self.table.item(row, 3).text()
+            try:
+                qty = float(qty_txt)
+                if qty < 0:
+                    raise ValueError
+            except ValueError:
+                qty = 1.0
+                
+            item = self.return_items.get(barcode)
+            if item:
+                if qty > item['max_qty']:
+                    QMessageBox.warning(self, "تنبيه", f"الحد الأقصى للكمية المرتجعة لهذا الصنف هو: {item['max_qty']}")
+                    qty = item['max_qty']
+                item['qty_to_return'] = qty
+                
+            self.update_table()
+
+    def calculate_total(self):
+        total = sum(item['price'] * item['qty_to_return'] for item in self.return_items.values())
+        self.lbl_refund.setText(f"إجمالي المبلغ المسترجع: {total:.2f} ل.س")
+
+    def confirm_return(self):
+        if not self.return_items:
+            QMessageBox.warning(self, "تنبيه", "الرجاء تحديد أصناف لإرجاعها أولاً")
+            return
+            
+        reply = QMessageBox.question(self, "تأكيد المرتجع", "هل أنت متأكد من إتمام عملية المرتجع وإعادة الأموال؟",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            session = get_session()
+            try:
+                from database import Product
+                for barcode, item in self.return_items.items():
+                    prod = session.query(Product).get(item['id'])
+                    if prod:
+                        if prod.parent_id:
+                            parent_prod = session.query(Product).get(prod.parent_id)
+                            if parent_prod:
+                                parent_prod.quantity += (item['qty_to_return'] * prod.units_in_box)
+                        else:
+                            prod.quantity += item['qty_to_return']
+                            
+                session.commit()
+                QMessageBox.information(self, "نجاح العملية", "تمت عملية المرتجع بنجاح وزيادة المخزون وإرجاع المال!")
+                self.clear_page()
+            except Exception as e:
+                session.rollback()
+                QMessageBox.critical(self, "خطأ", f"فشل إرجاع المرتجع: {str(e)}")
+            finally:
+                session.close()
+
+    def clear_page(self):
+        self.return_items.clear()
+        self.update_table()
+        self.barcode_input.clear()
