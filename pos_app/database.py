@@ -148,7 +148,7 @@ engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT key FROM app_settings LIMIT 1"))
+        conn.execute(text("SELECT barcode FROM products LIMIT 1"))
 except Exception:
     # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)
