@@ -175,7 +175,7 @@ class POSPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "الكمية", "الإجمالي"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.SectionResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         
         # Total Summary & Checkout Button
@@ -322,7 +322,7 @@ class InventoryPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "السعر", "الكمية المتاحة"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.SectionResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.doubleClicked.connect(self.load_row_to_form)
         layout.addWidget(self.table)
         
@@ -422,7 +422,7 @@ class SuppliersPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["الاسم", "الهاتف", "الرصيد المستحق"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.SectionResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         
         self.setLayout(layout)
@@ -504,7 +504,7 @@ class ReportsPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["الصنف", "الكمية الحالية", "سعر البيع"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.SectionResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         
         self.setLayout(layout)
