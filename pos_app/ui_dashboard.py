@@ -23,7 +23,7 @@ class DashboardWindow(QWidget):
         # 1. Sidebar Container (Right side for RTL Arabic)
         self.sidebar = QWidget()
         self.sidebar.setObjectName("sidebar")
-        self.sidebar.setFixedWidth(230)
+        self.sidebar.setFixedWidth(70)
         self.sidebar.setStyleSheet("""
             QWidget#sidebar {
                 background-color: #2c3e50;
@@ -34,73 +34,72 @@ class DashboardWindow(QWidget):
                 color: #ecf0f1;
                 border: none;
                 border-radius: 0px;
-                padding: 15px 20px;
-                text-align: right;
-                font-size: 15px;
-                font-weight: normal;
+                padding: 15px 5px;
+                text-align: center;
+                font-size: 24px;
             }
             QPushButton:hover {
                 background-color: #34495e;
             }
             QPushButton:checked {
                 background-color: #1abc9c;
-                font-weight: bold;
             }
         """)
         
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(0, 20, 0, 20)
-        sidebar_layout.setSpacing(10)
+        sidebar_layout.setSpacing(15)
         
         # Shop Logo / Title
-        shop_title = QLabel("المنزل السوري\nللسوبر ماركت")
+        shop_title = QLabel("🏡")
         shop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        shop_title.setStyleSheet("color: #1abc9c; font-size: 20px; font-weight: bold; margin-bottom: 20px;")
+        shop_title.setStyleSheet("font-size: 32px; margin-bottom: 20px;")
+        shop_title.setToolTip(f"المنزل السوري - المستخدم: {self.user.username} ({self.user.role})")
         sidebar_layout.addWidget(shop_title)
         
         # Sidebar Menu Buttons
-        self.btn_pos = QPushButton("🛒 نقطة البيع (الكاشير)")
+        self.btn_pos = QPushButton("🛒")
+        self.btn_pos.setToolTip("نقطة البيع (الكاشير)")
         self.btn_pos.setCheckable(True)
         self.btn_pos.setChecked(True)
         self.btn_pos.clicked.connect(lambda: self.switch_page(0))
         sidebar_layout.addWidget(self.btn_pos)
         
-        self.btn_inventory = QPushButton("📦 إدارة الأصناف")
+        self.btn_inventory = QPushButton("📦")
+        self.btn_inventory.setToolTip("إدارة الأصناف")
         self.btn_inventory.setCheckable(True)
         self.btn_inventory.clicked.connect(lambda: self.switch_page(1))
         sidebar_layout.addWidget(self.btn_inventory)
         
-        self.btn_suppliers = QPushButton("👥 إدارة الموردين")
+        self.btn_suppliers = QPushButton("👥")
+        self.btn_suppliers.setToolTip("إدارة الموردين")
         self.btn_suppliers.setCheckable(True)
         self.btn_suppliers.clicked.connect(lambda: self.switch_page(2))
         sidebar_layout.addWidget(self.btn_suppliers)
         
         # Only admins can access reports and settings
-        self.btn_reports = QPushButton("📈 التقارير والمبيعات")
+        self.btn_reports = QPushButton("📈")
+        self.btn_reports.setToolTip("التقارير والمبيعات")
         self.btn_reports.setCheckable(True)
         if self.user.role != 'admin':
             self.btn_reports.setEnabled(False)
             self.btn_reports.setToolTip("هذه الصفحة متاحة للمدير فقط")
-            self.btn_reports.setStyleSheet("color: #7f8c8d;")
+            self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 24px;")
         self.btn_reports.clicked.connect(lambda: self.switch_page(3))
         sidebar_layout.addWidget(self.btn_reports)
         
-        self.btn_sync = QPushButton("🔄 المزامنة السحابية")
+        self.btn_sync = QPushButton("🔄")
+        self.btn_sync.setToolTip("المزامنة السحابية")
         self.btn_sync.setCheckable(True)
         self.btn_sync.clicked.connect(lambda: self.switch_page(4))
         sidebar_layout.addWidget(self.btn_sync)
         
         sidebar_layout.addStretch()
         
-        # User Info & Logout
-        user_info = QLabel(f"المستخدم: {self.user.username}\nالصلاحية: {self.user.role}")
-        user_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        user_info.setStyleSheet("color: #bdc3c7; font-size: 12px; margin-bottom: 10px;")
-        sidebar_layout.addWidget(user_info)
-        
-        btn_logout = QPushButton("🚪 تسجيل الخروج")
+        btn_logout = QPushButton("🚪")
+        btn_logout.setToolTip("تسجيل الخروج")
         btn_logout.setObjectName("dangerButton")
-        btn_logout.setStyleSheet("background-color: #c0392b; color: white; padding: 10px; margin: 10px;")
+        btn_logout.setStyleSheet("background-color: #c0392b; color: white; padding: 10px; margin: 5px;")
         btn_logout.clicked.connect(self.on_logout)
         sidebar_layout.addWidget(btn_logout)
         
@@ -255,97 +254,106 @@ class POSPage(QWidget):
         self.setup_shortcuts()
 
     def init_ui(self):
-        # تقسيم الشاشة: يمين (إجمالي وبيانات عميل)، يسار (جدول المشتريات والباركود)
-        main_layout = QHBoxLayout()
+        # تصميم عمودي بالكامل
+        layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(12)
         
-        # 1. لوحة المشتريات والباركود (اليسار - تأخذ مساحة أكبر)
-        left_panel = QVBoxLayout()
+        # 1. القسم العلوي (الباركود والأزرار الفرعية)
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(10)
         
-        header = QLabel("🛒 نقطة البيع (الكاشير) - سوبر ماركت المنزل السوري")
-        header.setStyleSheet("font-size: 20px; font-weight: bold; color: #2c3e50;")
-        left_panel.addWidget(header)
-        
-        search_layout = QHBoxLayout()
         self.barcode_input = QLineEdit()
-        self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا... (F1 للبحث المتقدم)")
+        self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا... (F1 للبحث)")
+        self.barcode_input.setMinimumHeight(40)
         self.barcode_input.returnPressed.connect(self.add_by_barcode)
         
-        btn_search = QPushButton("🔍 بحث متقدم")
-        btn_search.setStyleSheet("background-color: #34495e;")
+        btn_search = QPushButton("🔍 بحث متقدم (F1)")
+        btn_search.setStyleSheet("background-color: #34495e; padding: 10px 15px;")
         btn_search.clicked.connect(self.open_search_dialog)
         
-        search_layout.addWidget(self.barcode_input, 4)
-        search_layout.addWidget(btn_search, 1)
-        left_panel.addLayout(search_layout)
+        btn_hold = QPushButton("⏸️ تعليق الفاتورة (F3)")
+        btn_hold.setStyleSheet("background-color: #e67e22; padding: 10px 15px;")
+        btn_hold.clicked.connect(self.hold_invoice)
         
-        # جدول المنتجات بالسلة
+        btn_recall = QPushButton("▶️ استدعاء المعلقات (F4)")
+        btn_recall.setStyleSheet("background-color: #3498db; padding: 10px 15px;")
+        btn_recall.clicked.connect(self.recall_invoice)
+        
+        btn_clear = QPushButton("🗑️ تفريغ السلة")
+        btn_clear.setObjectName("dangerButton")
+        btn_clear.setStyleSheet("background-color: #e74c3c; padding: 10px 15px;")
+        btn_clear.clicked.connect(self.clear_cart)
+        
+        top_layout.addWidget(self.barcode_input, 4)
+        top_layout.addWidget(btn_search, 1)
+        top_layout.addWidget(btn_hold, 1)
+        top_layout.addWidget(btn_recall, 1)
+        top_layout.addWidget(btn_clear, 1)
+        
+        layout.addLayout(top_layout)
+        
+        # 2. القسم الأوسط (الجدول بعرض الشاشة بالكامل)
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "الكمية / الوزن", "الإجمالي"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
-        left_panel.addWidget(self.table)
+        layout.addWidget(self.table)
         
-        # 2. لوحة الإعدادات والملخص (اليمين - أصغر)
-        right_panel = QVBoxLayout()
-        right_panel.setContentsMargins(10, 10, 10, 10)
+        # 3. القسم السفلي (بيانات العميل، طريقة الدفع، الإجمالي وزر الدفع بشكل أفقي متناسق)
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(15)
         
-        # بيانات العميل (لو أوردر)
-        cust_group = QGroupBox("بيانات الأوردر / التوصيل")
-        cust_layout = QFormLayout(cust_group)
+        # حقول العميل بشكل مدمج
+        cust_group = QGroupBox("بيانات العميل / الأوردر")
+        cust_layout = QHBoxLayout(cust_group)
+        cust_layout.setContentsMargins(10, 5, 10, 5)
+        cust_layout.setSpacing(10)
+        
         self.cust_name = QLineEdit()
         self.cust_name.setPlaceholderText("اسم العميل")
         self.cust_phone = QLineEdit()
         self.cust_phone.setPlaceholderText("رقم الهاتف")
         self.cust_address = QLineEdit()
-        self.cust_address.setPlaceholderText("العنوان للتوصيل")
-        cust_layout.addRow("الاسم:", self.cust_name)
-        cust_layout.addRow("الهاتف:", self.cust_phone)
-        cust_layout.addRow("العنوان:", self.cust_address)
-        right_panel.addWidget(cust_group)
+        self.cust_address.setPlaceholderText("عنوان التوصيل")
+        
+        cust_layout.addWidget(self.cust_name)
+        cust_layout.addWidget(self.cust_phone)
+        cust_layout.addWidget(self.cust_address)
         
         # طريقة الدفع
-        payment_group = QGroupBox("تفاصيل الدفع")
-        payment_layout = QFormLayout(payment_group)
+        payment_group = QGroupBox("طريقة الدفع")
+        payment_layout = QHBoxLayout(payment_group)
+        payment_layout.setContentsMargins(10, 5, 10, 5)
         self.payment_method = QComboBox()
         self.payment_method.addItems(["نقدي (Cash)", "فيزا (Visa)", "إنستا باي (InstaPay)", "فودافون كاش"])
-        payment_layout.addRow("طريقة الدفع:", self.payment_method)
-        right_panel.addWidget(payment_group)
+        self.payment_method.setMinimumHeight(35)
+        payment_layout.addWidget(self.payment_method)
         
-        # الإجمالي العام
+        # الإجمالي الإجمالي والدفع
+        summary_group = QGroupBox("الحساب")
+        summary_layout = QHBoxLayout(summary_group)
+        summary_layout.setContentsMargins(10, 5, 10, 5)
+        summary_layout.setSpacing(15)
+        
         self.total_label = QLabel("الإجمالي: 0.00 ل.س")
-        self.total_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #27ae60; margin: 15px 0;")
-        self.total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        right_panel.addWidget(self.total_label)
+        self.total_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #27ae60;")
         
-        # أزرار الإجراءات
         btn_pay = QPushButton("💳 دفع وإنهاء (F5)")
-        btn_pay.setStyleSheet("background-color: #2ecc71; font-size: 16px; padding: 12px; font-weight: bold;")
+        btn_pay.setStyleSheet("background-color: #2ecc71; color: white; font-size: 16px; padding: 8px 20px; font-weight: bold;")
+        btn_pay.setMinimumHeight(40)
         btn_pay.clicked.connect(self.checkout)
-        right_panel.addWidget(btn_pay)
         
-        btn_hold = QPushButton("⏸️ تعليق الفاتورة (F3)")
-        btn_hold.setStyleSheet("background-color: #e67e22; font-size: 14px; padding: 8px;")
-        btn_hold.clicked.connect(self.hold_invoice)
-        right_panel.addWidget(btn_hold)
+        summary_layout.addWidget(self.total_label)
+        summary_layout.addWidget(btn_pay)
         
-        btn_recall = QPushButton("▶️ استدعاء المعلقات (F4)")
-        btn_recall.setStyleSheet("background-color: #3498db; font-size: 14px; padding: 8px;")
-        btn_recall.clicked.connect(self.recall_invoice)
-        right_panel.addWidget(btn_recall)
+        bottom_layout.addWidget(cust_group, 4)
+        bottom_layout.addWidget(payment_group, 2)
+        bottom_layout.addWidget(summary_group, 3)
         
-        btn_clear = QPushButton("🗑️ تفريغ السلة")
-        btn_clear.setObjectName("dangerButton")
-        btn_clear.setStyleSheet("background-color: #e74c3c; font-size: 14px; padding: 8px;")
-        btn_clear.clicked.connect(self.clear_cart)
-        right_panel.addWidget(btn_clear)
-        
-        right_panel.addStretch()
-        
-        # تجميع اللوحات
-        main_layout.addLayout(left_panel, 3)
-        main_layout.addLayout(right_panel, 1)
-        self.setLayout(main_layout)
+        layout.addLayout(bottom_layout)
+        self.setLayout(layout)
 
     def setup_shortcuts(self):
         # F1: التركيز على حقل البحث
