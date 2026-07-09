@@ -105,6 +105,7 @@ class Invoice(Base):
     date = Column(DateTime, default=datetime.datetime.now)
     customer_name = Column(String(100))
     customer_phone = Column(String(50))
+    customer_address = Column(String(255))
     delivery_employee_id = Column(Integer, ForeignKey('employees.id'), nullable=True)
     
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
@@ -148,7 +149,7 @@ engine = create_engine('sqlite:///supermarket.db', echo=False)
 
 try:
     with engine.connect() as conn:
-        conn.execute(text("SELECT barcode FROM products LIMIT 1"))
+        conn.execute(text("SELECT customer_address FROM invoices LIMIT 1"))
 except Exception:
     # في حال عدم وجود الجداول الجديدة، نقوم بإعادة بناء قاعدة البيانات بالكامل
     Base.metadata.drop_all(engine)
@@ -231,7 +232,7 @@ def seed_initial_data():
         session.add(EmployeeTransaction(employee_id=emp.id, amount=180000.0, type="salary_payment", note="صرف راتب وسيم"))
         
         # مورد وفاتورة مشتريات دين
-        sup = Supplier(name="شركة الخير للصناعات الغذائية", contact_person="أبو الخير", phone="0944333222", balance=0.0)
+        sup = Supplier(name="شركة الخير للصناعات الغذائية", phone="0944333222", balance=0.0)
         session.add(sup)
         session.commit()
         

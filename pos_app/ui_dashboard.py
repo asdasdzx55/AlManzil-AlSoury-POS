@@ -299,33 +299,33 @@ class POSPage(QWidget):
     def init_ui(self):
         # تصميم عمودي بالكامل
         layout = QVBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(12)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
         
         # 1. القسم العلوي (الباركود والأزرار الفرعية)
         top_layout = QHBoxLayout()
-        top_layout.setSpacing(10)
+        top_layout.setSpacing(6)
         
         self.barcode_input = QLineEdit()
         self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا... (F1 للبحث)")
-        self.barcode_input.setMinimumHeight(40)
+        self.barcode_input.setMinimumHeight(32)
         self.barcode_input.returnPressed.connect(self.add_by_barcode)
         
         btn_search = QPushButton("🔍 بحث متقدم (F1)")
-        btn_search.setStyleSheet("background-color: #34495e; padding: 10px 15px;")
+        btn_search.setStyleSheet("background-color: #34495e; padding: 6px 12px;")
         btn_search.clicked.connect(self.open_search_dialog)
         
         btn_hold = QPushButton("⏸️ تعليق الفاتورة (F3)")
-        btn_hold.setStyleSheet("background-color: #e67e22; padding: 10px 15px;")
+        btn_hold.setStyleSheet("background-color: #e67e22; padding: 6px 12px;")
         btn_hold.clicked.connect(self.hold_invoice)
         
         btn_recall = QPushButton("▶️ استدعاء المعلقات (F4)")
-        btn_recall.setStyleSheet("background-color: #3498db; padding: 10px 15px;")
+        btn_recall.setStyleSheet("background-color: #3498db; padding: 6px 12px;")
         btn_recall.clicked.connect(self.recall_invoice)
         
         btn_clear = QPushButton("🗑️ تفريغ السلة")
         btn_clear.setObjectName("dangerButton")
-        btn_clear.setStyleSheet("background-color: #e74c3c; padding: 10px 15px;")
+        btn_clear.setStyleSheet("background-color: #e74c3c; padding: 6px 12px;")
         btn_clear.clicked.connect(self.clear_cart)
         
         top_layout.addWidget(self.barcode_input, 4)
@@ -339,10 +339,10 @@ class POSPage(QWidget):
         # قسم الكميات المتاحة على غرار النظام القديم ليصبح مألوفاً للمستخدم
         self.stock_group = QGroupBox("الكميات المتاحة للمنتج المحدد")
         self.stock_group.setObjectName("stockGroup")
-        self.stock_group.setMinimumHeight(60)
+        self.stock_group.setMinimumHeight(45)
         stock_layout = QHBoxLayout(self.stock_group)
-        stock_layout.setContentsMargins(15, 5, 15, 5)
-        stock_layout.setSpacing(20)
+        stock_layout.setContentsMargins(10, 4, 10, 4)
+        stock_layout.setSpacing(10)
         
         lbl_avail_title = QLabel("📦 الكمية المتوفرة في المخزن:")
         lbl_avail_title.setStyleSheet("font-weight: bold; color: #e74c3c; font-size: 14px;")
@@ -375,18 +375,22 @@ class POSPage(QWidget):
         
         # 3. القسم السفلي (بيانات العميل، طريقة الدفع، الإجمالي وزر الدفع بشكل أفقي متناسق)
         bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(15)
+        bottom_layout.setSpacing(10)
         
         # حقول العميل بشكل مدمج
         cust_group = QGroupBox("بيانات العميل / الأوردر")
         cust_layout = QHBoxLayout(cust_group)
-        cust_layout.setContentsMargins(10, 5, 10, 5)
-        cust_layout.setSpacing(10)
+        cust_layout.setContentsMargins(8, 4, 8, 4)
+        cust_layout.setSpacing(6)
         
         self.cust_name = QLineEdit()
         self.cust_name.setPlaceholderText("اسم العميل")
+        self.cust_name.textChanged.connect(self.lookup_customer_by_name)
+        
         self.cust_phone = QLineEdit()
         self.cust_phone.setPlaceholderText("رقم الهاتف")
+        self.cust_phone.textChanged.connect(self.lookup_customer_info)
+        
         self.cust_address = QLineEdit()
         self.cust_address.setPlaceholderText("عنوان التوصيل")
         
@@ -402,17 +406,17 @@ class POSPage(QWidget):
         # طريقة الدفع
         payment_group = QGroupBox("طريقة الدفع")
         payment_layout = QHBoxLayout(payment_group)
-        payment_layout.setContentsMargins(10, 5, 10, 5)
+        payment_layout.setContentsMargins(8, 4, 8, 4)
         self.payment_method = QComboBox()
         self.payment_method.addItems(["نقدي (Cash)", "فيزا (Visa)", "إنستا باي (InstaPay)", "فودافون كاش"])
-        self.payment_method.setMinimumHeight(35)
+        self.payment_method.setMinimumHeight(28)
         payment_layout.addWidget(self.payment_method)
         
         # الإجمالي الإجمالي والدفع
         summary_group = QGroupBox("الحساب والمدفوعات")
         summary_layout = QVBoxLayout(summary_group)
-        summary_layout.setContentsMargins(10, 10, 10, 10)
-        summary_layout.setSpacing(8)
+        summary_layout.setContentsMargins(8, 6, 8, 6)
+        summary_layout.setSpacing(4)
         
         self.total_label = QLabel("صافي القيمة: 0.00 ل.س")
         self.total_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2ecc71;")
@@ -671,6 +675,54 @@ class POSPage(QWidget):
                     self.lbl_avail_box.setText("لا يوجد كرتونة")
                     self.lbl_avail_unit.setText(f"{int(product.quantity)} قطعة")
 
+    def lookup_customer_info(self):
+        phone = self.cust_phone.text().strip()
+        if len(phone) < 7:
+            return
+        session = get_session()
+        try:
+            from database import Invoice
+            past_inv = session.query(Invoice).filter(Invoice.customer_phone == phone).order_by(Invoice.id.desc()).first()
+            if past_inv:
+                self.cust_phone.blockSignals(True)
+                self.cust_name.blockSignals(True)
+                self.cust_address.blockSignals(True)
+                if not self.cust_name.text().strip() and past_inv.customer_name:
+                    self.cust_name.setText(past_inv.customer_name)
+                if not self.cust_address.text().strip() and past_inv.customer_address:
+                    self.cust_address.setText(past_inv.customer_address)
+                self.cust_phone.blockSignals(False)
+                self.cust_name.blockSignals(False)
+                self.cust_address.blockSignals(False)
+        except Exception as e:
+            print(f"Error looking up customer by phone: {e}")
+        finally:
+            session.close()
+
+    def lookup_customer_by_name(self):
+        name = self.cust_name.text().strip()
+        if len(name) < 3:
+            return
+        session = get_session()
+        try:
+            from database import Invoice
+            past_inv = session.query(Invoice).filter(Invoice.customer_name.like(f"%{name}%")).order_by(Invoice.id.desc()).first()
+            if past_inv:
+                self.cust_phone.blockSignals(True)
+                self.cust_name.blockSignals(True)
+                self.cust_address.blockSignals(True)
+                if not self.cust_phone.text().strip() and past_inv.customer_phone:
+                    self.cust_phone.setText(past_inv.customer_phone)
+                if not self.cust_address.text().strip() and past_inv.customer_address:
+                    self.cust_address.setText(past_inv.customer_address)
+                self.cust_phone.blockSignals(False)
+                self.cust_name.blockSignals(False)
+                self.cust_address.blockSignals(False)
+        except Exception as e:
+            print(f"Error looking up customer by name: {e}")
+        finally:
+            session.close()
+
     def on_cell_changed(self, row, column):
         self.table.blockSignals(True)
         barcode = self.table.item(row, 0).text()
@@ -809,6 +861,7 @@ class POSPage(QWidget):
             # تسجيل الفاتورة الرئيسية
             cust_name = self.cust_name.text().strip()
             cust_phone = self.cust_phone.text().strip()
+            cust_address = self.cust_address.text().strip()
             delivery_emp_id = self.combo_delivery.currentData()
             
             new_inv = Invoice(
@@ -816,6 +869,7 @@ class POSPage(QWidget):
                 payment_method=self.payment_method.currentText(),
                 customer_name=cust_name if cust_name else None,
                 customer_phone=cust_phone if cust_phone else None,
+                customer_address=cust_address if cust_address else None,
                 delivery_employee_id=delivery_emp_id
             )
             session.add(new_inv)
@@ -895,7 +949,7 @@ class ReceiptDialog(QDialog):
         
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setFont(QFont("Courier New", 10))
+        self.text_edit.setFont(QFont("Segoe UI", 10))
         layout.addWidget(self.text_edit)
         
         buttons = QHBoxLayout()
@@ -931,38 +985,90 @@ class ReceiptDialog(QDialog):
             session.close()
             return
             
-        border = "--------------------------------------\n"
-        html = f"<div style='text-align: center; font-family: monospace;'>"
-        html += f"<h2>{shop_name}</h2>"
-        html += f"<p>{shop_address}</p>"
-        html += f"<p>هاتف: {shop_phone}</p>"
-        html += f"<p><b>رقم الفاتورة: #{inv.id}</b></p>"
-        html += f"<p>التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</p>"
-        html += f"</div>"
-        
-        html += f"<pre>{border}"
-        html += f"{'الصنف':<15} | {'الكمية':<6} | {'السعر':<7} | {'الإجمالي':<8}\n"
-        html += f"{border}"
-        
+        items_html = ""
         for item in inv.items:
-            name_truncated = item.product.name[:13]
             subtotal = item.price * item.quantity
-            html += f"{name_truncated:<15} | {item.quantity:<6} | {item.price:<7.1f} | {subtotal:<8.1f}\n"
+            qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
+            items_html += f"""
+            <tr style='border-bottom: 1px dashed #cbd5e1;'>
+                <td style='padding: 6px 4px; text-align: right;'>{item.product.name}</td>
+                <td style='padding: 6px 4px; text-align: center;'>{qty_str}</td>
+                <td style='padding: 6px 4px; text-align: left;'>{item.price:.2f}</td>
+                <td style='padding: 6px 4px; text-align: left; font-weight: bold;'>{subtotal:.2f}</td>
+            </tr>
+            """
             
-        html += f"{border}</pre>"
+        html = f"""
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #1e293b; padding: 5px;">
+            <!-- Header -->
+            <div style="text-align: center; border-bottom: 2px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 10px;">
+                <h2 style="margin: 0; color: #0284c7; font-size: 18px; font-weight: bold;">{shop_name}</h2>
+                <p style="margin: 3px 0; font-size: 11px; color: #64748b;">{shop_address}</p>
+                <p style="margin: 3px 0; font-size: 11px; color: #64748b;">📞 هاتف: {shop_phone}</p>
+                <div style="margin-top: 6px; font-size: 12px; font-weight: bold; background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px; display: inline-block; color: #1e293b;">
+                    فاتورة بيع #{inv.id}
+                </div>
+                <p style="margin: 3px 0; font-size: 10px; color: #64748b;">التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</p>
+            </div>
+            
+            <!-- Items Table -->
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px;">
+                <thead>
+                    <tr style="border-bottom: 2px dashed #94a3b8; background-color: #f8fafc;">
+                        <th style="text-align: right; padding: 4px; font-weight: bold; color: #0f172a;">الصنف</th>
+                        <th style="text-align: center; padding: 4px; font-weight: bold; color: #0f172a; width: 45px;">الكمية</th>
+                        <th style="text-align: left; padding: 4px; font-weight: bold; color: #0f172a; width: 55px;">السعر</th>
+                        <th style="text-align: left; padding: 4px; font-weight: bold; color: #0f172a; width: 65px;">الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
+            
+            <!-- Totals table -->
+            <table style="width: 100%; font-size: 12px; border-top: 2px dashed #94a3b8; margin-top: 5px; padding-top: 5px;">
+                <tr style="font-weight: bold; font-size: 14px; color: #10b981;">
+                    <td style="text-align: right; padding: 2px 0;">صافي القيمة:</td>
+                    <td style="text-align: left; padding: 2px 0;">{inv.total:.2f} ل.س</td>
+                </tr>
+        """
         
-        html += f"<div style='text-align: right; font-family: monospace; margin-top: 10px;'>"
-        html += f"<p><b>إجمالي الحساب: {inv.total:.2f} ل.س</b></p>"
-        html += f"<p>طريقة الدفع: {inv.payment_method}</p>"
+        if self.paid > 0:
+            html += f"""
+                <tr style="color: #475569;">
+                    <td style="text-align: right; padding: 2px 0;">المدفوع:</td>
+                    <td style="text-align: left; padding: 2px 0;">{self.paid:.2f} ل.س</td>
+                </tr>
+                <tr style="font-weight: bold; color: #ef4444;">
+                    <td style="text-align: right; padding: 2px 0;">المتبقي:</td>
+                    <td style="text-align: left; padding: 2px 0;">{self.remaining:.2f} ل.س</td>
+                </tr>
+            """
+            
+        html += f"""
+            </table>
+            
+            <!-- Footer info -->
+            <div style="border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 6px; font-size: 10px; color: #64748b; line-height: 1.4;">
+                <div>طريقة الدفع: {inv.payment_method}</div>
+        """
+        
         if inv.customer_name:
-            html += f"<p>العميل: {inv.customer_name}</p>"
-            if inv.customer_phone:
-                html += f"<p>الهاتف: {inv.customer_phone}</p>"
-        html += f"</div>"
-        
-        html += f"<div style='text-align: center; margin-top: 20px; font-family: monospace;'>"
-        html += f"<p>شكراً لزيارتكم وسعداء بخدمتكم!</p>"
-        html += f"</div>"
+            html += f"<div>العميل: {inv.customer_name}</div>"
+        if inv.customer_phone:
+            html += f"<div>الهاتف: {inv.customer_phone}</div>"
+        if inv.customer_address:
+            html += f"<div>العنوان: {inv.customer_address}</div>"
+            
+        html += f"""
+            </div>
+            
+            <div style="text-align: center; margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 10px; color: #64748b; font-style: italic;">
+                شكراً لزيارتكم وسعداء بخدمتكم!
+            </div>
+        </div>
+        """
         
         self.text_edit.setHtml(html)
         session.close()
