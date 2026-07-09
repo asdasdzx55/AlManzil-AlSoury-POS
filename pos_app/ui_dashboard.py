@@ -338,8 +338,8 @@ class POSPage(QWidget):
         
         # 2. القسم الأوسط (الجدول بعرض الشاشة بالكامل)
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "الكمية / الوزن", "الإجمالي"])
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "القطع", "الوزن (جرام/كجم)", "الإجمالي"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
         layout.addWidget(self.table)
@@ -516,8 +516,17 @@ class POSPage(QWidget):
             
             p_item = QTableWidgetItem(f"{item['price']:.2f}") # قابل للتعديل
             
-            qty_str = f"{item['qty']:.3f}" if item['is_weighted'] else str(int(item['qty']))
-            q_item = QTableWidgetItem(qty_str) # قابل للتعديل
+            if item['is_weighted']:
+                q_pcs = QTableWidgetItem("-")
+                q_pcs.setFlags(q_pcs.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                
+                qty_str = f"{item['qty']:.3f}"
+                q_weight = QTableWidgetItem(qty_str) # قابل للتعديل
+            else:
+                q_pcs = QTableWidgetItem(str(int(item['qty']))) # قابل للتعديل
+                
+                q_weight = QTableWidgetItem("-")
+                q_weight.setFlags(q_weight.flags() & ~Qt.ItemFlag.ItemIsEditable)
             
             s_item = QTableWidgetItem(f"{subtotal:.2f}")
             s_item.setFlags(s_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -525,8 +534,9 @@ class POSPage(QWidget):
             self.table.setItem(row, 0, b_item)
             self.table.setItem(row, 1, n_item)
             self.table.setItem(row, 2, p_item)
-            self.table.setItem(row, 3, q_item)
-            self.table.setItem(row, 4, s_item)
+            self.table.setItem(row, 3, q_pcs)
+            self.table.setItem(row, 4, q_weight)
+            self.table.setItem(row, 5, s_item)
             
         self.total_label.setText(f"الإجمالي: {total:.2f} ل.س")
         self.table.blockSignals(False)
@@ -559,7 +569,10 @@ class POSPage(QWidget):
             except ValueError:
                 pass
                 
-        elif column == 3: # تعديل الكمية / الوزن
+        elif column == 3: # تعديل القطع
+            if target_item['is_weighted']:
+                self.table.blockSignals(False)
+                return
             try:
                 new_qty = float(self.table.item(row, column).text())
                 if db_product:
@@ -571,13 +584,36 @@ class POSPage(QWidget):
                         if parent_prod:
                             max_qty = parent_prod.quantity / db_product.units_in_box
                             
-                    if not db_product.is_weighted:
-                        new_qty = int(new_qty)
+                    new_qty = int(new_qty)
                     if new_qty > max_qty:
                         QMessageBox.warning(self, "تنبيه", f"الكمية المتاحة في المخزن فقط: {max_qty}")
                         new_qty = max_qty
                     if new_qty <= 0:
                         new_qty = 1
+                target_item['qty'] = new_qty
+            except ValueError:
+                pass
+                
+        elif column == 4: # تعديل الوزن (الجرامات)
+            if not target_item['is_weighted']:
+                self.table.blockSignals(False)
+                return
+            try:
+                new_qty = float(self.table.item(row, column).text())
+                if db_product:
+                    max_qty = db_product.quantity
+                    if db_product.parent_id:
+                        session = get_session()
+                        parent_prod = session.query(Product).get(db_product.parent_id)
+                        session.close()
+                        if parent_prod:
+                            max_qty = parent_prod.quantity / db_product.units_in_box
+                            
+                    if new_qty > max_qty:
+                        QMessageBox.warning(self, "تنبيه", f"الوزن المتاح في المخزن فقط: {max_qty:.3f}")
+                        new_qty = max_qty
+                    if new_qty <= 0:
+                        new_qty = 0.001
                 target_item['qty'] = new_qty
             except ValueError:
                 pass
