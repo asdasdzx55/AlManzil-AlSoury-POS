@@ -336,12 +336,41 @@ class POSPage(QWidget):
         
         layout.addLayout(top_layout)
         
+        # قسم الكميات المتاحة على غرار النظام القديم ليصبح مألوفاً للمستخدم
+        self.stock_group = QGroupBox("الكميات المتاحة للمنتج المحدد")
+        self.stock_group.setObjectName("stockGroup")
+        self.stock_group.setMinimumHeight(60)
+        stock_layout = QHBoxLayout(self.stock_group)
+        stock_layout.setContentsMargins(15, 5, 15, 5)
+        stock_layout.setSpacing(20)
+        
+        lbl_avail_title = QLabel("📦 الكمية المتوفرة في المخزن:")
+        lbl_avail_title.setStyleSheet("font-weight: bold; color: #e74c3c; font-size: 14px;")
+        
+        self.lbl_box_title = QLabel("الكرتونة / العبوة:")
+        self.lbl_avail_box = QLabel("-")
+        self.lbl_avail_box.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71; background-color: #2c3e50; padding: 2px 10px; border-radius: 4px;")
+        
+        self.lbl_unit_title = QLabel("القطع / الوزن:")
+        self.lbl_avail_unit = QLabel("-")
+        self.lbl_avail_unit.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71; background-color: #2c3e50; padding: 2px 10px; border-radius: 4px;")
+        
+        stock_layout.addWidget(lbl_avail_title)
+        stock_layout.addWidget(self.lbl_box_title)
+        stock_layout.addWidget(self.lbl_avail_box)
+        stock_layout.addWidget(self.lbl_unit_title)
+        stock_layout.addWidget(self.lbl_avail_unit)
+        stock_layout.addStretch()
+        
+        layout.addWidget(self.stock_group)
+        
         # 2. القسم الأوسط (الجدول بعرض الشاشة بالكامل)
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "القطع", "الوزن (جرام/كجم)", "الإجمالي"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
+        self.table.itemSelectionChanged.connect(self.on_selection_changed)
         layout.addWidget(self.table)
         
         # 3. القسم السفلي (بيانات العميل، طريقة الدفع، الإجمالي وزر الدفع بشكل أفقي متناسق)
@@ -380,13 +409,27 @@ class POSPage(QWidget):
         payment_layout.addWidget(self.payment_method)
         
         # الإجمالي الإجمالي والدفع
-        summary_group = QGroupBox("الحساب")
-        summary_layout = QHBoxLayout(summary_group)
-        summary_layout.setContentsMargins(10, 5, 10, 5)
-        summary_layout.setSpacing(15)
+        summary_group = QGroupBox("الحساب والمدفوعات")
+        summary_layout = QVBoxLayout(summary_group)
+        summary_layout.setContentsMargins(10, 10, 10, 10)
+        summary_layout.setSpacing(8)
         
-        self.total_label = QLabel("الإجمالي: 0.00 ل.س")
-        self.total_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #27ae60;")
+        self.total_label = QLabel("صافي القيمة: 0.00 ل.س")
+        self.total_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2ecc71;")
+        
+        form_layout = QFormLayout()
+        form_layout.setSpacing(6)
+        
+        self.input_paid = QLineEdit()
+        self.input_paid.setPlaceholderText("أدخل المبلغ المدفوع...")
+        self.input_paid.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
+        self.input_paid.textChanged.connect(self.calculate_change)
+        
+        self.lbl_change = QLabel("0.00 ل.س")
+        self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
+        
+        form_layout.addRow("المدفوع:", self.input_paid)
+        form_layout.addRow("المتبقي:", self.lbl_change)
         
         btn_pay = QPushButton("💳 دفع وإنهاء (F5)")
         btn_pay.setStyleSheet("background-color: #2ecc71; color: white; font-size: 16px; padding: 8px 20px; font-weight: bold;")
@@ -394,6 +437,7 @@ class POSPage(QWidget):
         btn_pay.clicked.connect(self.checkout)
         
         summary_layout.addWidget(self.total_label)
+        summary_layout.addLayout(form_layout)
         summary_layout.addWidget(btn_pay)
         
         bottom_layout.addWidget(cust_group, 4)
@@ -465,6 +509,9 @@ class POSPage(QWidget):
                 parent_prod = session.query(Product).get(product.parent_id)
                 if parent_prod:
                     available_qty = parent_prod.quantity / product.units_in_box
+            
+            # تحديث عرض الكميات المتاحة في الواجهة
+            self.display_available_qty(product, session)
             
             if available_qty <= 0:
                 QMessageBox.warning(self, "تنبيه", "هذا المنتج غير متوفر في المخزن")
@@ -538,8 +585,91 @@ class POSPage(QWidget):
             self.table.setItem(row, 4, q_weight)
             self.table.setItem(row, 5, s_item)
             
-        self.total_label.setText(f"الإجمالي: {total:.2f} ل.س")
+        self.total_label.setText(f"صافي القيمة: {total:.2f} ل.س")
+        self.calculate_change()
         self.table.blockSignals(False)
+
+    def calculate_change(self):
+        total = sum(item['price'] * item['qty'] for item in self.cart.values())
+        paid_text = self.input_paid.text().strip()
+        if not paid_text:
+            self.lbl_change.setText("0.00 ل.س")
+            return
+        try:
+            paid = float(paid_text)
+            change = paid - total
+            if change < 0:
+                self.lbl_change.setText(f"متبقٍ عليه: {-change:.2f} ل.س")
+                self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
+            else:
+                self.lbl_change.setText(f"{change:.2f} ل.س")
+                self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71;")
+        except ValueError:
+            self.lbl_change.setText("خطأ في القيمة")
+            self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
+
+    def on_selection_changed(self):
+        selected_items = self.table.selectedItems()
+        if not selected_items:
+            self.lbl_avail_box.setText("-")
+            self.lbl_avail_unit.setText("-")
+            return
+        row = selected_items[0].row()
+        barcode_item = self.table.item(row, 0)
+        if not barcode_item:
+            return
+        barcode = barcode_item.text()
+        
+        session = get_session()
+        from database import Product, ProductBarcode
+        product = session.query(Product).filter_by(barcode=barcode).first()
+        if not product:
+            barcode_entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            if barcode_entry:
+                product = barcode_entry.product
+                
+        if product:
+            self.display_available_qty(product, session)
+        else:
+            self.lbl_avail_box.setText("-")
+            self.lbl_avail_unit.setText("-")
+        session.close()
+
+    def display_available_qty(self, product, session):
+        if product.is_weighted:
+            self.lbl_box_title.setText("الكرتونة / العبوة:")
+            self.lbl_avail_box.setText("غير ينطبق")
+            self.lbl_unit_title.setText("الوزن المتوفر:")
+            self.lbl_avail_unit.setText(f"{product.quantity:.3f} كجم")
+        else:
+            self.lbl_box_title.setText("الكرتونة / العبوة:")
+            self.lbl_unit_title.setText("القطع المتاحة:")
+            
+            if product.parent_id: # Scanned product is a box
+                parent_prod = session.query(Product).get(product.parent_id)
+                if parent_prod:
+                    units = parent_prod.quantity
+                    box_size = product.units_in_box
+                    boxes = int(units // box_size)
+                    pieces = int(units % box_size)
+                    self.lbl_avail_box.setText(f"{boxes} عبوة")
+                    self.lbl_avail_unit.setText(f"{pieces} قطعة")
+                else:
+                    self.lbl_avail_box.setText(f"{int(product.quantity)} عبوة")
+                    self.lbl_avail_unit.setText("0 قطعة")
+            else: # Scanned product is a single item
+                # Check if there is a box item pointing to this single item
+                box_prod = session.query(Product).filter_by(parent_id=product.id).first()
+                if box_prod:
+                    units = product.quantity
+                    box_size = box_prod.units_in_box
+                    boxes = int(units // box_size)
+                    pieces = int(units % box_size)
+                    self.lbl_avail_box.setText(f"{boxes} عبوة")
+                    self.lbl_avail_unit.setText(f"{pieces} قطعة")
+                else:
+                    self.lbl_avail_box.setText("لا يوجد كرتونة")
+                    self.lbl_avail_unit.setText(f"{int(product.quantity)} قطعة")
 
     def on_cell_changed(self, row, column):
         self.table.blockSignals(True)
@@ -715,8 +845,20 @@ class POSPage(QWidget):
                     
             session.commit()
             
+            # حساب القيمة المدفوعة والمتبقية للطباعة
+            paid_val = 0.0
+            change_val = 0.0
+            try:
+                paid_val = float(self.input_paid.text().strip())
+                change_val = paid_val - total_amount
+                if change_val < 0:
+                    change_val = 0.0
+            except ValueError:
+                paid_val = total_amount
+                change_val = 0.0
+                
             # عرض الريسيت الحراري التفاعلي
-            dialog = ReceiptDialog(new_inv.id, self)
+            dialog = ReceiptDialog(new_inv.id, paid=paid_val, remaining=change_val, parent=self)
             dialog.exec()
             
             # تنظيف البيانات
@@ -724,6 +866,10 @@ class POSPage(QWidget):
             self.cust_name.clear()
             self.cust_phone.clear()
             self.cust_address.clear()
+            self.input_paid.clear()
+            self.lbl_change.setText("0.00 ل.س")
+            self.lbl_avail_box.setText("-")
+            self.lbl_avail_unit.setText("-")
             self.load_delivery_employees()
             
         except Exception as e:
@@ -735,9 +881,11 @@ class POSPage(QWidget):
 
 # ==================== RECEIPT DIALOG ====================
 class ReceiptDialog(QDialog):
-    def __init__(self, invoice_id, parent=None):
+    def __init__(self, invoice_id, paid=0.0, remaining=0.0, parent=None):
         super().__init__(parent)
         self.invoice_id = invoice_id
+        self.paid = paid
+        self.remaining = remaining
         self.setWindowTitle("فاتورة البيع - ريسيت الكاشير")
         self.resize(380, 550)
         self.init_ui()
