@@ -1520,7 +1520,6 @@ class InventoryPage(QWidget):
         self.table_edit.setRowCount(0)
         session = get_session()
         products = session.query(Product).all()
-        session.close()
         
         for p in products:
             row = self.table_edit.rowCount()
@@ -1537,6 +1536,7 @@ class InventoryPage(QWidget):
             
             type_str = "علبة" if p.parent_id else ("بالوزن" if p.is_weighted else "بالقطعة")
             self.table_edit.setItem(row, 5, QTableWidgetItem(type_str))
+        session.close()
 
     def open_edit_dialog(self):
         row = self.table_edit.currentRow()
