@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QFormLayout, QComboBox, QMessageBox, QDoubleSpinBox, QSpinBox,
                              QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
                              QTabWidget, QTextEdit, QDateEdit)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence
 from database import get_session, Product, Category, Supplier, User
 
@@ -560,7 +560,8 @@ class POSPage(QWidget):
             total += subtotal
             
             b_item = QTableWidgetItem(item['barcode'])
-            b_item.setFlags(b_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            b_item.setData(Qt.ItemDataRole.UserRole, cart_key)
+            b_item.setFlags(b_item.flags() | Qt.ItemFlag.ItemIsEditable)
             
             n_item = QTableWidgetItem(item['name'])
             n_item.setFlags(n_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -725,14 +726,18 @@ class POSPage(QWidget):
 
     def on_cell_changed(self, row, column):
         self.table.blockSignals(True)
-        barcode = self.table.item(row, 0).text()
         
-        target_item = None
-        for key, item in self.cart.items():
-            if item['barcode'] == barcode:
-                target_item = item
-                break
-                
+        b_item = self.table.item(row, 0)
+        if not b_item:
+            self.table.blockSignals(False)
+            return
+            
+        cart_key = b_item.data(Qt.ItemDataRole.UserRole)
+        if not cart_key:
+            self.table.blockSignals(False)
+            return
+            
+        target_item = self.cart.get(cart_key)
         if not target_item:
             self.table.blockSignals(False)
             return
@@ -741,7 +746,63 @@ class POSPage(QWidget):
         db_product = session.query(Product).get(target_item['id'])
         session.close()
         
-        if column == 2: # تعديل السعر
+        if column == 0: # تعديل الباركود
+            new_barcode = b_item.text().strip()
+            if not new_barcode:
+                self.table.blockSignals(False)
+                self.update_cart_table()
+                return
+                
+            if new_barcode != target_item['barcode']:
+                # البحث عن منتج جديد بهذا الباركود في قاعدة البيانات
+                session = get_session()
+                from database import ProductBarcode
+                product = session.query(Product).filter_by(barcode=new_barcode).first()
+                if not product:
+                    entry = session.query(ProductBarcode).filter_by(barcode=new_barcode).first()
+                    if entry:
+                        product = entry.product
+                if not product:
+                    product = session.query(Product).filter_by(name=new_barcode).first()
+                    
+                if product:
+                    available_qty = product.quantity
+                    if product.parent_id:
+                        parent_prod = session.query(Product).get(product.parent_id)
+                        if parent_prod:
+                            available_qty = parent_prod.quantity / product.units_in_box
+                            
+                    if available_qty <= 0:
+                        QMessageBox.warning(self, "تنبيه", "هذا المنتج غير متوفر في المخزن")
+                        session.close()
+                        self.table.blockSignals(False)
+                        self.update_cart_table()
+                        return
+                        
+                    new_cart_key = f"prod_{product.id}"
+                    del self.cart[cart_key]
+                    self.cart[new_cart_key] = {
+                        'id': product.id,
+                        'name': product.name,
+                        'price': product.price,
+                        'qty': 1.0,
+                        'is_weighted': product.is_weighted,
+                        'parent_id': product.parent_id,
+                        'units_in_box': product.units_in_box,
+                        'barcode': new_barcode
+                    }
+                    session.close()
+                    self.table.blockSignals(False)
+                    self.update_cart_table()
+                    return
+                else:
+                    QMessageBox.warning(self, "تنبيه", "الباركود المدخل غير مسجل في النظام")
+                    session.close()
+                    self.table.blockSignals(False)
+                    self.update_cart_table()
+                    return
+                    
+        elif column == 2: # تعديل السعر
             try:
                 new_price = float(self.table.item(row, column).text())
                 if db_product and new_price < db_product.price:
@@ -966,6 +1027,11 @@ class ReceiptDialog(QDialog):
         self.setLayout(layout)
         
         self.generate_receipt_content()
+        
+        # محاولة الطباعة الفورية الصامتة لطابعة الريسيت المحددة بالويندوز
+        printed = self.print_receipt_silently()
+        if printed:
+            QTimer.singleShot(800, self.accept)
 
     def generate_receipt_content(self):
         session = get_session()
@@ -1073,6 +1139,23 @@ class ReceiptDialog(QDialog):
         self.text_edit.setHtml(html)
         session.close()
 
+    def print_receipt_silently(self):
+        session = get_session()
+        from database import AppSetting
+        printer_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
+        session.close()
+        
+        if printer_set and printer_set.value:
+            try:
+                from PyQt6.QtPrintSupport import QPrinter
+                printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+                printer.setPrinterName(printer_set.value)
+                self.text_edit.print(printer)
+                return True
+            except Exception as e:
+                print(f"Error printing silently: {e}")
+        return False
+
     def print_receipt(self):
         from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
@@ -1177,9 +1260,22 @@ class QuickProductDialog(QDialog):
         is_weighted = self.check_weighted.isChecked()
         subcat_id = self.combo_subcat.currentData()
         
-        if not barcode or not name or not subcat_id:
+        if not name or not subcat_id:
             QMessageBox.warning(self, "تنبيه", "يرجى تعبئة جميع الحقول المطلوبة")
             return
+            
+        if not barcode:
+            # توليد باركود محلي من 5 أرقام تلقائياً
+            session = get_session()
+            from database import Product
+            max_val = 10000
+            for p in session.query(Product).all():
+                if p.barcode and p.barcode.isdigit() and len(p.barcode) == 5:
+                    val = int(p.barcode)
+                    if val > max_val:
+                        max_val = val
+            barcode = str(max_val + 1)
+            session.close()
             
         session = get_session()
         from database import ProductBarcode
@@ -3380,6 +3476,14 @@ class SettingsPage(QWidget):
         self.input_shop_phone.setPlaceholderText("رقم الهاتف للتواصل...")
         self.input_shop_phone.setMinimumHeight(35)
         
+        self.combo_printers = QComboBox()
+        self.combo_printers.setMinimumHeight(35)
+        
+        from PyQt6.QtPrintSupport import QPrinterInfo
+        self.combo_printers.addItem("تعطيل الطباعة التلقائية (لا يوجد)", "")
+        for printer_name in QPrinterInfo.availablePrinterNames():
+            self.combo_printers.addItem(printer_name, printer_name)
+            
         btn_save = QPushButton("حفظ إعدادات المتجر 💾")
         btn_save.clicked.connect(self.save_settings)
         btn_save.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold; font-size: 14px; padding: 10px;")
@@ -3387,6 +3491,7 @@ class SettingsPage(QWidget):
         layout.addRow("اسم المحل (في الريسيت):", self.input_shop_name)
         layout.addRow("عنوان المحل:", self.input_shop_address)
         layout.addRow("رقم الهاتف:", self.input_shop_phone)
+        layout.addRow("طابعة الريسيت الافتراضية:", self.combo_printers)
         layout.addRow("", btn_save)
         
         self.tab_info.setLayout(layout)
@@ -3398,16 +3503,22 @@ class SettingsPage(QWidget):
         name = session.query(AppSetting).filter_by(key='shop_name').first()
         addr = session.query(AppSetting).filter_by(key='shop_address').first()
         phone = session.query(AppSetting).filter_by(key='shop_phone').first()
+        printer_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
         
         if name: self.input_shop_name.setText(name.value)
         if addr: self.input_shop_address.setText(addr.value)
         if phone: self.input_shop_phone.setText(phone.value)
+        if printer_set:
+            idx = self.combo_printers.findData(printer_set.value)
+            if idx >= 0:
+                self.combo_printers.setCurrentIndex(idx)
         session.close()
 
     def save_settings(self):
         name = self.input_shop_name.text().strip()
         addr = self.input_shop_address.text().strip()
         phone = self.input_shop_phone.text().strip()
+        printer_name = self.combo_printers.currentData()
         
         if not name:
             QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم المحل")
@@ -3437,10 +3548,17 @@ class SettingsPage(QWidget):
         else:
             p_set.value = phone
             
+        pr_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
+        if not pr_set:
+            pr_set = AppSetting(key='receipt_printer', value=printer_name)
+            session.add(pr_set)
+        else:
+            pr_set.value = printer_name
+            
         session.commit()
         session.close()
         
-        QMessageBox.information(self, "تم الحفظ", "تم حفظ معلومات المحل بنجاح وتحديث الفواتير والريسيت!")
+        QMessageBox.information(self, "تم الحفظ", "تم حفظ معلومات وإعدادات المحل بنجاح وتحديث الفواتير والريسيت!")
 
     # --- التبويب الثاني: إدارة الشركاء ---
     def setup_partners_tab(self):
