@@ -445,13 +445,17 @@ class POSPage(QWidget):
         from database import ProductBarcode
         session = get_session()
         
-        # البحث عن الباركود في جدول باركودات المنتجات
-        barcode_entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
-        product = None
-        if barcode_entry:
-            product = barcode_entry.product
-        else:
-            # أو البحث بالاسم مباشرة
+        # 1. البحث أولاً في الباركود الرئيسي لجدول المنتجات
+        product = session.query(Product).filter_by(barcode=barcode).first()
+        
+        # 2. إذا لم يعثر عليه، نبحث في جدول الباركودات الفرعية البديلة
+        if not product:
+            barcode_entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            if barcode_entry:
+                product = barcode_entry.product
+                
+        # 3. إذا لم يعثر عليه، نبحث بالاسم كخيار أخير
+        if not product:
             product = session.query(Product).filter_by(name=barcode).first()
             
         if product:
@@ -855,9 +859,17 @@ class QuickProductDialog(QDialog):
             
         session = get_session()
         from database import ProductBarcode
-        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
-        if entry:
-            prod = entry.product
+        
+        # 1. التحقق من الباركود الرئيسي
+        prod = session.query(Product).filter_by(barcode=barcode).first()
+        
+        # 2. التحقق من الباركودات البديلة
+        if not prod:
+            entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            if entry:
+                prod = entry.product
+                
+        if prod:
             self.input_name.setText(prod.name)
             self.input_cost.setValue(prod.cost_price if prod.cost_price else 0.0)
             self.input_price.setValue(prod.price)
@@ -881,21 +893,36 @@ class QuickProductDialog(QDialog):
             
         session = get_session()
         from database import ProductBarcode
-        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
-        if entry:
-            prod = entry.product
+        
+        # 1. البحث في الباركود الرئيسي
+        prod = session.query(Product).filter_by(barcode=barcode).first()
+        
+        # 2. البحث في الباركودات البديلة
+        if not prod:
+            entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            if entry:
+                prod = entry.product
+                
+        if prod:
             prod.name = name
             prod.cost_price = cost
             prod.price = price
             prod.is_weighted = is_weighted
             prod.subcategory_id = subcat_id
+            # تحديث الباركود الرئيسي في حال كان الباركود الحالي هو الأساسي
+            if prod.barcode == barcode:
+                pass
         else:
-            prod = Product(name=name, price=price, cost_price=cost, quantity=0.0, is_weighted=is_weighted, subcategory_id=subcat_id)
+            prod = Product(
+                name=name, 
+                price=price, 
+                cost_price=cost, 
+                quantity=0.0, 
+                is_weighted=is_weighted, 
+                subcategory_id=subcat_id,
+                barcode=barcode
+            )
             session.add(prod)
-            session.commit()
-            
-            new_bc = ProductBarcode(product_id=prod.id, barcode=barcode)
-            session.add(new_bc)
             
         session.commit()
         session.close()
@@ -1056,11 +1083,18 @@ class PurchasesPage(QWidget):
             
         session = get_session()
         from database import ProductBarcode
-        entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
-        product = None
-        if entry:
-            product = entry.product
-        else:
+        
+        # 1. البحث في الباركود الرئيسي للمنتج
+        product = session.query(Product).filter_by(barcode=barcode).first()
+        
+        # 2. البحث في الباركودات البديلة
+        if not product:
+            entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            if entry:
+                product = entry.product
+                
+        # 3. البحث بالاسم
+        if not product:
             product = session.query(Product).filter_by(name=barcode).first()
             
         if product:
