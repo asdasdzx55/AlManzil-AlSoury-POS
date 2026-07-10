@@ -1056,36 +1056,38 @@ class ReceiptDialog(QDialog):
             subtotal = item.price * item.quantity
             qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
             items_html += f"""
-            <tr style='border-bottom: 1px solid #dddddd;'>
-                <td style='padding: 8pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: #000000;'>{item.product.name}</td>
-                <td style='padding: 8pt 2pt; text-align: center; font-size: 10pt; color: #111111;'>{qty_str}</td>
-                <td style='padding: 8pt 2pt; text-align: left; font-size: 10pt; color: #111111;'>{item.price:.2f}</td>
-                <td style='padding: 8pt 2pt; text-align: left; font-weight: bold; font-size: 11pt; color: #000000;'>{subtotal:.2f}</td>
+            <tr style='border-bottom: 1px solid black;'>
+                <td style='padding: 10pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black;'>{item.product.name}</td>
+                <td style='padding: 10pt 2pt; text-align: center; font-size: 11pt; color: black;'>{qty_str}</td>
+                <td style='padding: 10pt 2pt; text-align: left; font-size: 11pt; color: black;'>{item.price:.2f}</td>
+                <td style='padding: 10pt 2pt; text-align: left; font-weight: bold; font-size: 11pt; color: black;'>{subtotal:.2f}</td>
             </tr>
             """
             
         html = f"""
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #000000; padding: 10pt; width: 100%; line-height: 1.5;">
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: black; padding: 12pt; width: 100%; line-height: 1.6;">
             <!-- Header -->
-            <div style="text-align: center; border-bottom: 3px double #000000; padding-bottom: 8pt; margin-bottom: 12pt;">
-                <span style="font-size: 18pt; font-weight: bold; display: block; margin-bottom: 4pt; color: #000000;">{shop_name}</span>
-                <span style="font-size: 10pt; display: block; margin-bottom: 2pt; color: #333333;">{shop_address}</span>
-                <span style="font-size: 10pt; display: block; color: #333333;">📞 هاتف: {shop_phone}</span>
+            <div style="text-align: center; border-bottom: 3px double black; padding-bottom: 10pt; margin-bottom: 15pt;">
+                <span style="font-size: 18pt; font-weight: bold; display: block; margin-bottom: 6pt; color: black;">{shop_name}</span>
+                <span style="font-size: 11pt; display: block; margin-bottom: 4pt; color: black;">{shop_address}</span>
+                <span style="font-size: 11pt; display: block; color: black;">📞 هاتف: {shop_phone}</span>
                 
-                <div style="margin-top: 10pt; font-size: 12pt; font-weight: bold; border: 2px solid #000000; padding: 4pt 12pt; border-radius: 4pt; display: inline-block; color: #000000;">
+                <div style="margin-top: 12pt; font-size: 13pt; font-weight: bold; border: 2px solid black; padding: 6pt 16pt; border-radius: 4pt; display: inline-block; color: black;">
                     فاتورة بيع #{inv.id}
                 </div>
-                <div style="margin-top: 6pt; font-size: 9.5pt; color: #444444;">التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</div>
+                <div style="margin-top: 8pt; font-size: 10pt; color: black;">التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</div>
             </div>
             
+            <div style="height: 5pt;"></div>
+            
             <!-- Items Table -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 12pt;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15pt;">
                 <thead>
-                    <tr style="border-bottom: 2px solid #000000;">
-                        <th style="text-align: right; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000;">الصنف</th>
-                        <th style="text-align: center; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 45pt;">الكمية</th>
-                        <th style="text-align: left; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 55pt;">السعر</th>
-                        <th style="text-align: left; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 65pt;">الإجمالي</th>
+                    <tr style="border-bottom: 2px solid black;">
+                        <th style="text-align: right; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 50%;">الصنف</th>
+                        <th style="text-align: center; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 15%;">الكمية</th>
+                        <th style="text-align: left; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 15%;">السعر</th>
+                        <th style="text-align: left; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 20%;">الإجمالي</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1093,37 +1095,41 @@ class ReceiptDialog(QDialog):
                 </tbody>
             </table>
             
+            <div style="height: 5pt;"></div>
+            
             <!-- Totals Box -->
-            <div style="border-top: 1px dashed #000000; padding-top: 8pt; margin-top: 8pt; margin-bottom: 12pt;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
-                    <tr style="font-weight: bold; font-size: 14pt; color: #000000;">
-                        <td style="text-align: right; padding: 4pt 0;">صافي القيمة:</td>
-                        <td style="text-align: left; padding: 4pt 0;">{inv.total:.2f} ل.س</td>
+            <div style="border-top: 1px dashed black; padding-top: 10pt; margin-bottom: 15pt;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12pt;">
+                    <tr style="font-weight: bold; font-size: 15pt; color: black;">
+                        <td style="text-align: right; padding: 5pt 0;">صافي القيمة:</td>
+                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{inv.total:.2f} ل.س</td>
                     </tr>
         """
         
         if self.paid > 0:
             html += f"""
-                    <tr style="font-size: 11pt; color: #222222;">
-                        <td style="text-align: right; padding: 4pt 0;">المدفوع:</td>
-                        <td style="text-align: left; padding: 4pt 0;">{self.paid:.2f} ل.س</td>
+                    <tr style="font-size: 11.5pt; color: black;">
+                        <td style="text-align: right; padding: 5pt 0;">المدفوع:</td>
+                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{self.paid:.2f} ل.س</td>
                     </tr>
-                    <tr style="font-weight: bold; font-size: 12pt; border-top: 1px dashed #000000; color: #000000;">
-                        <td style="text-align: right; padding: 6pt 0 4pt 0;">المتبقي:</td>
-                        <td style="text-align: left; padding: 6pt 0 4pt 0;">{self.remaining:.2f} ل.س</td>
+                    <tr style="font-weight: bold; font-size: 13pt; border-top: 1px dashed black; color: black;">
+                        <td style="text-align: right; padding: 7pt 0 5pt 0;">المتبقي:</td>
+                        <td style="text-align: left; padding: 7pt 0 5pt 0; direction: ltr;">{self.remaining:.2f} ل.س</td>
                     </tr>
             """
             
         html += f"""
                 </table>
             </div>
+            
+            <div style="height: 5pt;"></div>
         """
         
         if inv.customer_name or inv.customer_phone or inv.customer_address:
             html += f"""
             <!-- Customer Box -->
-            <div style="border: 1.5px solid #000000; border-radius: 4pt; padding: 8pt; margin-top: 12pt; margin-bottom: 12pt; font-size: 10.5pt; line-height: 1.5; color: #000000;">
-                <div style="font-weight: bold; border-bottom: 1.5px solid #000000; padding-bottom: 4pt; margin-bottom: 6pt; font-size: 11pt; color: #000000;">👤 بيانات العميل والتوصيل</div>
+            <div style="border: 2px solid black; border-radius: 4pt; padding: 10pt; margin-top: 15pt; margin-bottom: 15pt; font-size: 11pt; line-height: 1.6; color: black;">
+                <div style="font-weight: bold; border-bottom: 2px solid black; padding-bottom: 6pt; margin-bottom: 8pt; font-size: 12pt; color: black;">👤 بيانات العميل والتوصيل</div>
             """
             if inv.customer_name:
                 html += f"<div><b>العميل:</b> {inv.customer_name}</div>"
@@ -1135,17 +1141,19 @@ class ReceiptDialog(QDialog):
             
         html += f"""
             <!-- Footer info -->
-            <div style="border-top: 1px dashed #000000; padding-top: 8pt; margin-top: 8pt; font-size: 10.5pt; line-height: 1.4; text-align: center; color: #111111;">
-                <div>طريقة الدفع: <span style="font-weight: bold; color: #000000;">{inv.payment_method}</span></div>
+            <div style="border-top: 1px dashed black; padding-top: 10pt; margin-top: 10pt; font-size: 11pt; line-height: 1.5; text-align: center; color: black;">
+                <div>طريقة الدفع: <span style="font-weight: bold; color: black;">{inv.payment_method.replace('(Cash)', '- Cash').replace('(', ' - ').replace(')', '')}</span></div>
             </div>
             
             <!-- Barcode decoration -->
-            <div style="text-align: center; margin-top: 15pt; margin-bottom: 12pt;">
-                <div style="display: inline-block; letter-spacing: 2px; font-family: monospace; font-size: 10pt; color: #333333;">|||||||||||||||||||||||||||||||||</div>
-                <div style="font-size: 9pt; font-family: monospace; color: #333333; margin-top: 2px;">INV-{inv.id}</div>
+            <div style="text-align: center; margin-top: 20pt; margin-bottom: 15pt;">
+                <div style="display: inline-block; letter-spacing: 3px; font-family: monospace; font-size: 11pt; color: black;">|||||||||||||||||||||||||||||||||</div>
+                <div style="font-size: 10pt; font-family: monospace; color: black; margin-top: 4px;">INV-{inv.id}</div>
             </div>
             
-            <div style="text-align: center; border-top: 2px solid #000000; padding-top: 8pt; font-size: 10.5pt; color: #000000; font-style: italic; font-weight: bold;">
+            <div style="height: 10pt;"></div>
+            
+            <div style="text-align: center; border-top: 2px solid black; padding-top: 10pt; font-size: 11.5pt; color: black; font-style: italic; font-weight: bold;">
                 شكراً لزيارتكم وسعداء بخدمتكم!
             </div>
         </div>
