@@ -1041,10 +1041,12 @@ class ReceiptDialog(QDialog):
         name_set = session.query(AppSetting).filter_by(key='shop_name').first()
         addr_set = session.query(AppSetting).filter_by(key='shop_address').first()
         phone_set = session.query(AppSetting).filter_by(key='shop_phone').first()
+        web_set = session.query(AppSetting).filter_by(key='shop_website').first()
         
         shop_name = name_set.value if name_set else "سوبر ماركت المنزل السوري"
         shop_address = addr_set.value if addr_set else "دمشق"
         shop_phone = phone_set.value if phone_set else "0999999999"
+        shop_website = web_set.value if (web_set and web_set.value) else "https://almanzil-alsoury.com"
         
         inv = session.query(Invoice).get(self.invoice_id)
         if not inv:
@@ -1057,12 +1059,34 @@ class ReceiptDialog(QDialog):
             qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
             items_html += f"""
             <tr>
-                <td style='padding: 12pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border-bottom: 1px solid black;'>{item.product.name}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10pt; color: black; border-bottom: 1px solid black;'>{qty_str}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10pt; color: black; border-bottom: 1px solid black;'>{item.price:.2f}</td>
-                <td style='padding: 12pt 2pt; text-align: left; font-weight: bold; font-size: 10pt; color: black; border-bottom: 1px solid black;'>{subtotal:.2f}</td>
+                <td style='padding: 12pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border-bottom: 1px dashed black;'>{item.product.name}</td>
+                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{qty_str}</td>
+                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{item.price:.2f}</td>
+                <td style='padding: 12pt 2pt; text-align: left; font-weight: bold; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{subtotal:.2f}</td>
             </tr>
+            <tr style='height: 8pt;'><td colspan='4' style='border: none; padding: 0;'></td></tr>
             """
+            
+        # توليد كود الـ QR الخاص بموقع المحل برمجياً في الذاكرة بصيغة Base64
+        qr_base64 = ""
+        try:
+            import qrcode
+            import io
+            import base64
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=3,
+                border=1,
+            )
+            qr.add_data(shop_website)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buffered = io.BytesIO()
+            img.save(buffered, format="PNG")
+            qr_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        except Exception as e:
+            print(f"Error generating QR code: {e}")
             
         html = f"""
         <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: black; padding: 12pt; width: 100%; line-height: 1.6;">
@@ -1155,6 +1179,14 @@ class ReceiptDialog(QDialog):
                 <div style="display: inline-block; letter-spacing: 3px; font-family: monospace; font-size: 11pt; color: black;">|||||||||||||||||||||||||||||||||</div>
                 <div style="font-size: 10pt; font-family: monospace; color: black; margin-top: 4px;">INV-{inv.id}</div>
             </div>
+            
+            <!-- QR Code Section -->
+            {f'''
+            <div style="text-align: center; margin-top: 20pt; margin-bottom: 20pt;">
+                <img src="data:image/png;base64,{qr_base64}" style="width: 110pt; height: 110pt; border: 1.5px solid black; padding: 2pt;" />
+                <div style="font-size: 9.5pt; color: black; margin-top: 6px; font-weight: bold;">{shop_website}</div>
+            </div>
+            ''' if qr_base64 else ''}
             
             <div style="height: 15pt;"></div>
             
@@ -3575,6 +3607,10 @@ class SettingsPage(QWidget):
         self.input_shop_phone.setPlaceholderText("رقم الهاتف للتواصل...")
         self.input_shop_phone.setMinimumHeight(35)
         
+        self.input_shop_website = QLineEdit()
+        self.input_shop_website.setPlaceholderText("رابط موقع المحل الإلكتروني (QR code)...")
+        self.input_shop_website.setMinimumHeight(35)
+        
         self.combo_printers = QComboBox()
         self.combo_printers.setMinimumHeight(35)
         
@@ -3594,6 +3630,7 @@ class SettingsPage(QWidget):
         layout.addRow("اسم المحل (في الريسيت):", self.input_shop_name)
         layout.addRow("عنوان المحل:", self.input_shop_address)
         layout.addRow("رقم الهاتف:", self.input_shop_phone)
+        layout.addRow("موقع المحل الإلكتروني (QR):", self.input_shop_website)
         layout.addRow("طابعة الريسيت الافتراضية:", self.combo_printers)
         layout.addRow("عرض ورق ريسيت الكاشير:", self.combo_paper_width)
         layout.addRow("", btn_save)
@@ -3607,12 +3644,14 @@ class SettingsPage(QWidget):
         name = session.query(AppSetting).filter_by(key='shop_name').first()
         addr = session.query(AppSetting).filter_by(key='shop_address').first()
         phone = session.query(AppSetting).filter_by(key='shop_phone').first()
+        website = session.query(AppSetting).filter_by(key='shop_website').first()
         printer_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
         width_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
         
         if name: self.input_shop_name.setText(name.value)
         if addr: self.input_shop_address.setText(addr.value)
         if phone: self.input_shop_phone.setText(phone.value)
+        if website: self.input_shop_website.setText(website.value)
         if printer_set:
             idx = self.combo_printers.findData(printer_set.value)
             if idx >= 0:
@@ -3627,6 +3666,7 @@ class SettingsPage(QWidget):
         name = self.input_shop_name.text().strip()
         addr = self.input_shop_address.text().strip()
         phone = self.input_shop_phone.text().strip()
+        web = self.input_shop_website.text().strip()
         printer_name = self.combo_printers.currentData()
         paper_width = self.combo_paper_width.currentText()
         
@@ -3657,6 +3697,13 @@ class SettingsPage(QWidget):
             session.add(p_set)
         else:
             p_set.value = phone
+            
+        w_set_url = session.query(AppSetting).filter_by(key='shop_website').first()
+        if not w_set_url:
+            w_set_url = AppSetting(key='shop_website', value=web)
+            session.add(w_set_url)
+        else:
+            w_set_url.value = web
             
         pr_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
         if not pr_set:
