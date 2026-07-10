@@ -1158,16 +1158,35 @@ class ReceiptDialog(QDialog):
         session = get_session()
         from database import AppSetting
         printer_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
+        width_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
         session.close()
         
         if printer_set and printer_set.value:
             try:
                 from PyQt6.QtPrintSupport import QPrinter
-                from PyQt6.QtCore import QMarginsF
-                from PyQt6.QtGui import QPageLayout
+                from PyQt6.QtCore import QSizeF, QMarginsF
+                from PyQt6.QtGui import QPageLayout, QPageSize
+                
+                # تحديد عرض الورق بالمليمتر (80mm أو 58mm)
+                width_mm = 80
+                if width_set and "58mm" in width_set.value:
+                    width_mm = 58
+                    
+                # حساب الارتفاع المطلوب ديناميكياً بناءً على حجم المستند لمنع هدر الورق
+                doc = self.text_edit.document()
+                doc_height_px = doc.size().height()
+                # تحويل من بكسل (شاشة 96 DPI) إلى مليمتر
+                height_mm = (doc_height_px / 96.0) * 25.4 + 15 # إضافة 15 مم للهوامش والأمان
+                if height_mm < 80:
+                    height_mm = 80
+                
                 printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
                 printer.setPrinterName(printer_set.value)
-                printer.setPageMargins(QMarginsF(2, 2, 2, 2), QPageLayout.Unit.Millimeter)
+                
+                # ضبط مقاس الصفحة المخصص للطابعة
+                page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
+                printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
+                
                 self.text_edit.print(printer)
                 return True
             except Exception as e:
@@ -1176,10 +1195,28 @@ class ReceiptDialog(QDialog):
 
     def print_receipt(self):
         from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
-        from PyQt6.QtCore import QMarginsF
-        from PyQt6.QtGui import QPageLayout
+        from PyQt6.QtCore import QSizeF, QMarginsF
+        from PyQt6.QtGui import QPageLayout, QPageSize
+        
+        session = get_session()
+        from database import AppSetting
+        width_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
+        session.close()
+        
+        width_mm = 80
+        if width_set and "58mm" in width_set.value:
+            width_mm = 58
+            
+        doc = self.text_edit.document()
+        doc_height_px = doc.size().height()
+        height_mm = (doc_height_px / 96.0) * 25.4 + 15
+        if height_mm < 80:
+            height_mm = 80
+            
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
-        printer.setPageMargins(QMarginsF(2, 2, 2, 2), QPageLayout.Unit.Millimeter)
+        page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
+        printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
+        
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.text_edit.print(printer)
@@ -3505,6 +3542,10 @@ class SettingsPage(QWidget):
         for printer_name in QPrinterInfo.availablePrinterNames():
             self.combo_printers.addItem(printer_name, printer_name)
             
+        self.combo_paper_width = QComboBox()
+        self.combo_paper_width.setMinimumHeight(35)
+        self.combo_paper_width.addItems(["80mm (كبير)", "58mm (صغير)"])
+        
         btn_save = QPushButton("حفظ إعدادات المتجر 💾")
         btn_save.clicked.connect(self.save_settings)
         btn_save.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold; font-size: 14px; padding: 10px;")
@@ -3513,6 +3554,7 @@ class SettingsPage(QWidget):
         layout.addRow("عنوان المحل:", self.input_shop_address)
         layout.addRow("رقم الهاتف:", self.input_shop_phone)
         layout.addRow("طابعة الريسيت الافتراضية:", self.combo_printers)
+        layout.addRow("عرض ورق ريسيت الكاشير:", self.combo_paper_width)
         layout.addRow("", btn_save)
         
         self.tab_info.setLayout(layout)
@@ -3525,6 +3567,7 @@ class SettingsPage(QWidget):
         addr = session.query(AppSetting).filter_by(key='shop_address').first()
         phone = session.query(AppSetting).filter_by(key='shop_phone').first()
         printer_set = session.query(AppSetting).filter_by(key='receipt_printer').first()
+        width_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
         
         if name: self.input_shop_name.setText(name.value)
         if addr: self.input_shop_address.setText(addr.value)
@@ -3533,6 +3576,10 @@ class SettingsPage(QWidget):
             idx = self.combo_printers.findData(printer_set.value)
             if idx >= 0:
                 self.combo_printers.setCurrentIndex(idx)
+        if width_set:
+            idx = self.combo_paper_width.findText(width_set.value)
+            if idx >= 0:
+                self.combo_paper_width.setCurrentIndex(idx)
         session.close()
 
     def save_settings(self):
@@ -3540,6 +3587,7 @@ class SettingsPage(QWidget):
         addr = self.input_shop_address.text().strip()
         phone = self.input_shop_phone.text().strip()
         printer_name = self.combo_printers.currentData()
+        paper_width = self.combo_paper_width.currentText()
         
         if not name:
             QMessageBox.warning(self, "تنبيه", "الرجاء إدخال اسم المحل")
@@ -3575,6 +3623,13 @@ class SettingsPage(QWidget):
             session.add(pr_set)
         else:
             pr_set.value = printer_name
+            
+        w_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
+        if not w_set:
+            w_set = AppSetting(key='receipt_paper_width', value=paper_width)
+            session.add(w_set)
+        else:
+            w_set.value = paper_width
             
         session.commit()
         session.close()
