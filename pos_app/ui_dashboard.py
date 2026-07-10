@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QGroupBox, QCheckBox, QDialog, QListWidget, QListWidgetItem, QDialogButtonBox,
                              QTabWidget, QTextEdit, QDateEdit)
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence
+from PyQt6.QtGui import QFont, QIcon, QShortcut, QKeySequence, QPainter
 from database import get_session, Product, Category, Supplier, User
 
 class DashboardWindow(QWidget):
@@ -1175,35 +1175,34 @@ class ReceiptDialog(QDialog):
                 doc = self.text_edit.document().clone()
                 doc.setDocumentMargin(0)
                 
-                # 2. تحويل قياسات المستند إلى النقاط (Points) لضمان تطابق المقاس 1:1 بدون أي تصغير أو تكبير للخط
+                # عرض المستند بالنقاط (1 بوصة = 72 نقطة = 25.4 ملم)
                 width_points = (width_mm / 25.4) * 72.0
-                
-                # ضبط عرض المستند أولاً بالنقاط ليقوم بإعادة توزيع الأسطر وترتيب الكلمات بناءً على هذا العرض الجديد
                 doc.setTextWidth(width_points)
                 
-                # حساب الارتفاع الفعلي لمحتوى المستند بالنقاط بعد توزيع النصوص
+                # حساب الارتفاع الفعلي لمحتوى المستند بالنقاط
                 doc_height_px = doc.size().height()
                 doc_height_points = (doc_height_px / 96.0) * 72.0
                 height_points = doc_height_points + 30.0 # هامش أمان سفلي
                 if height_points < 250:
                     height_points = 250
                     
-                # تحويل الارتفاع الكلي إلى مليمتر لإرساله لتعريف الطابعة
+                # تحويل الارتفاع الكلي إلى مليمتر لتعريف الطابعة
                 height_mm = (height_points / 72.0) * 25.4
                 
-                # 3. إعداد الطابعة والصفحة بمقاس متطابق تماماً بالمليمتر
+                # 2. إعداد الطابعة
                 printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
                 printer.setPrinterName(printer_set.value)
                 
                 page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
-                printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
+                printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(0, 0, 0, 0)))
                 
-                # 4. ضبط أبعاد المستند لتتطابق تماماً بالنقاط مع مساحة الطباعة الفعلية للطابعة
-                doc.setPageSize(QSizeF(width_points, height_points))
-                
-                # 5. إرسال المستند للطباعة
-                doc.print(printer)
-                return True
+                # 3. الرسم المباشر 1:1 بدون أي تحجيم تلقائي من النظام
+                painter = QPainter()
+                if painter.begin(printer):
+                    doc.setPageSize(QSizeF(width_points, height_points))
+                    doc.drawContents(painter)
+                    painter.end()
+                    return True
             except Exception as e:
                 print(f"Error printing silently: {e}")
         return False
@@ -1238,13 +1237,15 @@ class ReceiptDialog(QDialog):
         
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
         page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
-        printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
-        
-        doc.setPageSize(QSizeF(width_points, height_points))
+        printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(0, 0, 0, 0)))
         
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            doc.print(printer)
+            painter = QPainter()
+            if painter.begin(printer):
+                doc.setPageSize(QSizeF(width_points, height_points))
+                doc.drawContents(painter)
+                painter.end()
 
 
 # ==================== QUICK PRODUCT DIALOG (FLOATING) ====================
