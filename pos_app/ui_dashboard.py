@@ -1167,27 +1167,42 @@ class ReceiptDialog(QDialog):
                 from PyQt6.QtCore import QSizeF, QMarginsF
                 from PyQt6.QtGui import QPageLayout, QPageSize
                 
-                # تحديد عرض الورق بالمليمتر (80mm أو 58mm)
-                width_mm = 80
+                # 1. تحديد عرض الورق بالمليمتر (80mm أو 58mm)
+                width_mm = 80.0
                 if width_set and "58mm" in width_set.value:
-                    width_mm = 58
+                    width_mm = 58.0
                     
-                # حساب الارتفاع المطلوب ديناميكياً بناءً على حجم المستند لمنع هدر الورق
-                doc = self.text_edit.document()
-                doc_height_px = doc.size().height()
-                # تحويل من بكسل (شاشة 96 DPI) إلى مليمتر
-                height_mm = (doc_height_px / 96.0) * 25.4 + 15 # إضافة 15 مم للهوامش والأمان
-                if height_mm < 80:
-                    height_mm = 80
+                doc = self.text_edit.document().clone()
+                doc.setDocumentMargin(0)
                 
+                # 2. تحويل قياسات المستند إلى النقاط (Points) لضمان تطابق المقاس 1:1 بدون أي تصغير أو تكبير للخط
+                width_points = (width_mm / 25.4) * 72.0
+                
+                # ضبط عرض المستند أولاً بالنقاط ليقوم بإعادة توزيع الأسطر وترتيب الكلمات بناءً على هذا العرض الجديد
+                doc.setTextWidth(width_points)
+                
+                # حساب الارتفاع الفعلي لمحتوى المستند بالنقاط بعد توزيع النصوص
+                doc_height_px = doc.size().height()
+                doc_height_points = (doc_height_px / 96.0) * 72.0
+                height_points = doc_height_points + 30.0 # هامش أمان سفلي
+                if height_points < 250:
+                    height_points = 250
+                    
+                # تحويل الارتفاع الكلي إلى مليمتر لإرساله لتعريف الطابعة
+                height_mm = (height_points / 72.0) * 25.4
+                
+                # 3. إعداد الطابعة والصفحة بمقاس متطابق تماماً بالمليمتر
                 printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
                 printer.setPrinterName(printer_set.value)
                 
-                # ضبط مقاس الصفحة المخصص للطابعة
                 page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
                 printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
                 
-                self.text_edit.print(printer)
+                # 4. ضبط أبعاد المستند لتتطابق تماماً بالنقاط مع مساحة الطباعة الفعلية للطابعة
+                doc.setPageSize(QSizeF(width_points, height_points))
+                
+                # 5. إرسال المستند للطباعة
+                doc.print(printer)
                 return True
             except Exception as e:
                 print(f"Error printing silently: {e}")
@@ -1203,23 +1218,33 @@ class ReceiptDialog(QDialog):
         width_set = session.query(AppSetting).filter_by(key='receipt_paper_width').first()
         session.close()
         
-        width_mm = 80
+        width_mm = 80.0
         if width_set and "58mm" in width_set.value:
-            width_mm = 58
+            width_mm = 58.0
             
-        doc = self.text_edit.document()
+        doc = self.text_edit.document().clone()
+        doc.setDocumentMargin(0)
+        
+        width_points = (width_mm / 25.4) * 72.0
+        doc.setTextWidth(width_points)
+        
         doc_height_px = doc.size().height()
-        height_mm = (doc_height_px / 96.0) * 25.4 + 15
-        if height_mm < 80:
-            height_mm = 80
+        doc_height_points = (doc_height_px / 96.0) * 72.0
+        height_points = doc_height_points + 30.0
+        if height_points < 250:
+            height_points = 250
             
+        height_mm = (height_points / 72.0) * 25.4
+        
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
         page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
         printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(1, 1, 1, 1), QPageLayout.Unit.Millimeter))
         
+        doc.setPageSize(QSizeF(width_points, height_points))
+        
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.text_edit.print(printer)
+            doc.print(printer)
 
 
 # ==================== QUICK PRODUCT DIALOG (FLOATING) ====================
