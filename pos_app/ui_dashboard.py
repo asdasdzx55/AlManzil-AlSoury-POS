@@ -1059,10 +1059,10 @@ class ReceiptDialog(QDialog):
             qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
             items_html += f"""
             <tr>
-                <td style='padding: 12pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border-bottom: 1px dashed black;'>{item.product.name}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{qty_str}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{item.price:.2f}</td>
-                <td style='padding: 12pt 2pt; text-align: left; font-weight: bold; font-size: 10.5pt; color: black; border-bottom: 1px dashed black;'>{subtotal:.2f}</td>
+                <td style='padding: 12pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border-bottom: 1px dashed black; width: 42%;'>{item.product.name}</td>
+                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 12%;'>{qty_str}</td>
+                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 23%;'>{item.price:.2f}</td>
+                <td style='padding: 12pt 2pt; text-align: left; font-weight: bold; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 23%;'>{subtotal:.2f}</td>
             </tr>
             <tr style='height: 8pt;'><td colspan='4' style='border: none; padding: 0;'></td></tr>
             """
@@ -1095,9 +1095,9 @@ class ReceiptDialog(QDialog):
             
             <!-- Header -->
             <div style="text-align: center; padding-bottom: 10pt; margin-bottom: 15pt;">
-                <span style="font-size: 19pt; font-weight: bold; display: block; margin-bottom: 6pt; color: black;">{shop_name}</span>
+                <span style="font-size: 16pt; font-weight: bold; display: block; margin-bottom: 6pt; color: black;">{shop_name}</span>
                 <span style="font-size: 11pt; display: block; margin-bottom: 4pt; color: black;">{shop_address}</span>
-                <span style="font-size: 11pt; display: block; color: black;">📞 هاتف: {shop_phone}</span>
+                <span style="font-size: 11pt; display: block; color: black;">الهاتف: {shop_phone}</span>
                 
                 <div style="margin-top: 15pt; margin-bottom: 10pt;">
                     <div style="font-size: 13pt; font-weight: bold; border: 2px solid black; padding: 6pt 16pt; border-radius: 4pt; display: inline-block; color: black;">
@@ -1127,25 +1127,28 @@ class ReceiptDialog(QDialog):
             <div style="height: 10pt;"></div>
             
             <!-- Totals Box -->
-            <div style="border-top: 1px dashed black; padding-top: 12pt; margin-bottom: 15pt;">
+            <div style="border-top: 2px solid black; border-bottom: 2px solid black; padding-top: 8pt; padding-bottom: 8pt; margin-bottom: 15pt;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12pt;">
                     <tr style="font-weight: bold; font-size: 15pt; color: black;">
-                        <td style="width: 50%; text-align: right; padding: 6pt 0;">صافي القيمة:</td>
-                        <td style="width: 50%; text-align: left; padding: 6pt 0; direction: ltr; font-weight: bold;">{inv.total:.2f} ج.م</td>
+                        <td style="width: 60%; text-align: right; padding: 4pt 0;">صافي القيمة</td>
+                        <td style="width: 40%; text-align: left; padding: 4pt 0; direction: ltr; font-weight: bold;">{inv.total:.2f} ج.م</td>
                     </tr>
         """
         
         if self.paid > 0:
             html += f"""
                     <tr style="font-size: 11.5pt; color: black;">
-                        <td style="width: 50%; text-align: right; padding: 6pt 0; border-top: 1px solid black;">المدفوع:</td>
-                        <td style="width: 50%; text-align: left; padding: 6pt 0; direction: ltr; border-top: 1px solid black;">{self.paid:.2f} ج.م</td>
+                        <td style="width: 60%; text-align: right; padding: 4pt 0;">المدفوع</td>
+                        <td style="width: 40%; text-align: left; padding: 4pt 0; direction: ltr;">{self.paid:.2f} ج.م</td>
                     </tr>
                     <tr style="font-weight: bold; font-size: 13pt; color: black;">
-                        <td style="width: 50%; text-align: right; padding: 8pt 0 6pt 0; border-top: 2px solid black;">المتبقي:</td>
-                        <td style="width: 50%; text-align: left; padding: 8pt 0 6pt 0; direction: ltr; border-top: 2px solid black; font-weight: bold;">{self.remaining:.2f} ج.م</td>
+                        <td style="width: 60%; text-align: right; padding: 6pt 0 4pt 0;">المتبقي</td>
+                        <td style="width: 40%; text-align: left; padding: 6pt 0 4pt 0; direction: ltr; font-weight: bold;">{self.remaining:.2f} ج.m</td>
                     </tr>
             """
+            
+        # Fix currency symbol formatting issue
+        html = html.replace('ج.m', 'ج.م')
             
         html += f"""
                 </table>
@@ -1158,7 +1161,7 @@ class ReceiptDialog(QDialog):
             html += f"""
             <!-- Customer Box -->
             <div style="border: 2px solid black; border-radius: 4pt; padding: 12pt; margin-top: 15pt; margin-bottom: 15pt; font-size: 11pt; line-height: 1.6; color: black;">
-                <div style="font-weight: bold; border-bottom: 2px solid black; padding-bottom: 6pt; margin-bottom: 8pt; font-size: 12pt; color: black;">👤 بيانات العميل والتوصيل</div>
+                <div style="font-weight: bold; border-bottom: 2px solid black; padding-bottom: 6pt; margin-bottom: 8pt; font-size: 12pt; color: black;">بيانات العميل والتوص</div>
             """
             if inv.customer_name:
                 html += f"<div><b>العميل:</b> {inv.customer_name}</div>"
