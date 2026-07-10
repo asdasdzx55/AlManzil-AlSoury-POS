@@ -1102,7 +1102,7 @@ class ReceiptDialog(QDialog):
                 <table style="width: 100%; border-collapse: collapse; font-size: 12pt;">
                     <tr style="font-weight: bold; font-size: 15pt; color: black;">
                         <td style="text-align: right; padding: 5pt 0;">صافي القيمة:</td>
-                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{inv.total:.2f} ل.س</td>
+                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{inv.total:.2f} ج.م</td>
                     </tr>
         """
         
@@ -1110,11 +1110,11 @@ class ReceiptDialog(QDialog):
             html += f"""
                     <tr style="font-size: 11.5pt; color: black;">
                         <td style="text-align: right; padding: 5pt 0;">المدفوع:</td>
-                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{self.paid:.2f} ل.س</td>
+                        <td style="text-align: left; padding: 5pt 0; direction: ltr;">{self.paid:.2f} ج.م</td>
                     </tr>
                     <tr style="font-weight: bold; font-size: 13pt; border-top: 1px dashed black; color: black;">
                         <td style="text-align: right; padding: 7pt 0 5pt 0;">المتبقي:</td>
-                        <td style="text-align: left; padding: 7pt 0 5pt 0; direction: ltr;">{self.remaining:.2f} ل.س</td>
+                        <td style="text-align: left; padding: 7pt 0 5pt 0; direction: ltr;">{self.remaining:.2f} ج.م</td>
                     </tr>
             """
             
@@ -1183,38 +1183,30 @@ class ReceiptDialog(QDialog):
                 doc = self.text_edit.document().clone()
                 doc.setDocumentMargin(0)
                 
-                # عرض المستند بالنقاط (1 بوصة = 72 نقطة = 25.4 ملم)
-                width_points = (width_mm / 25.4) * 72.0
-                doc.setTextWidth(width_points)
+                # عرض المستند بالبكسل بناءً على دقة الشاشة (96 DPI)
+                width_px = (width_mm / 25.4) * 96.0
+                doc.setTextWidth(width_px)
                 
-                # حساب الارتفاع الفعلي لمحتوى المستند بالنقاط
+                # حساب الارتفاع الفعلي لمحتوى المستند بالبكسل
                 doc_height_px = doc.size().height()
-                doc_height_points = (doc_height_px / 96.0) * 72.0
-                height_points = doc_height_points + 40.0 # هامش أمان سفلي
-                if height_points < 250:
-                    height_points = 250
+                height_px = doc_height_px + 40.0 # هامش أمان سفلي
+                if height_px < 300:
+                    height_px = 300
                     
                 # تحويل الارتفاع الكلي إلى مليمتر لتعريف الطابعة
-                height_mm = (height_points / 72.0) * 25.4
+                height_mm = (height_px / 96.0) * 25.4
                 
-                # 2. إعداد الطابعة
+                # 2. إعداد الطابعة والصفحة بمقاس متطابق بالمليمتر
                 printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
                 printer.setPrinterName(printer_set.value)
                 
                 page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
                 printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(0, 0, 0, 0)))
                 
-                # 3. الرسم المباشر 1:1 مع التوسيط
+                # 3. الرسم المباشر 1:1 ليتطابق مع حواف البكرة الفعلية تلقائياً
                 painter = QPainter()
                 if painter.begin(printer):
-                    # حساب عرض الصفحة الفعلي بالنقاط من الطابعة وتوسيط الفاتورة
-                    printer_width_pts = printer.pageLayout().paintRect(QPageLayout.Unit.Point).width()
-                    offset_x = (printer_width_pts - width_points) / 2.0
-                    if offset_x < 0:
-                        offset_x = 0.0
-                    painter.translate(offset_x, 0.0)
-                    
-                    doc.setPageSize(QSizeF(width_points, height_points))
+                    doc.setPageSize(QSizeF(width_px, height_px))
                     doc.drawContents(painter)
                     painter.end()
                     return True
@@ -1239,16 +1231,16 @@ class ReceiptDialog(QDialog):
         doc = self.text_edit.document().clone()
         doc.setDocumentMargin(0)
         
-        width_points = (width_mm / 25.4) * 72.0
-        doc.setTextWidth(width_points)
+        # عرض المستند بالبكسل (96 DPI)
+        width_px = (width_mm / 25.4) * 96.0
+        doc.setTextWidth(width_px)
         
         doc_height_px = doc.size().height()
-        doc_height_points = (doc_height_px / 96.0) * 72.0
-        height_points = doc_height_points + 40.0
-        if height_points < 250:
-            height_points = 250
+        height_px = doc_height_px + 40.0
+        if height_px < 300:
+            height_px = 300
             
-        height_mm = (height_points / 72.0) * 25.4
+        height_mm = (height_px / 96.0) * 25.4
         
         printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
         page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
@@ -1258,13 +1250,7 @@ class ReceiptDialog(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             painter = QPainter()
             if painter.begin(printer):
-                printer_width_pts = printer.pageLayout().paintRect(QPageLayout.Unit.Point).width()
-                offset_x = (printer_width_pts - width_points) / 2.0
-                if offset_x < 0:
-                    offset_x = 0.0
-                painter.translate(offset_x, 0.0)
-                
-                doc.setPageSize(QSizeF(width_points, height_points))
+                doc.setPageSize(QSizeF(width_px, height_px))
                 doc.drawContents(painter)
                 painter.end()
 
