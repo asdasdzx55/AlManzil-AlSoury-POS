@@ -1056,35 +1056,36 @@ class ReceiptDialog(QDialog):
             subtotal = item.price * item.quantity
             qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
             items_html += f"""
-            <tr style='border-bottom: 1px solid #e2e8f0;'>
-                <td style='padding: 5px 3px; text-align: right; font-size: 9.5pt;'>{item.product.name}</td>
-                <td style='padding: 5px 3px; text-align: center; font-size: 9.5pt;'>{qty_str}</td>
-                <td style='padding: 5px 3px; text-align: left; font-size: 9.5pt;'>{item.price:.2f}</td>
-                <td style='padding: 5px 3px; text-align: left; font-weight: bold; font-size: 9.5pt;'>{subtotal:.2f}</td>
+            <tr style='border-bottom: 1px solid #dddddd;'>
+                <td style='padding: 8pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: #000000;'>{item.product.name}</td>
+                <td style='padding: 8pt 2pt; text-align: center; font-size: 10pt; color: #111111;'>{qty_str}</td>
+                <td style='padding: 8pt 2pt; text-align: left; font-size: 10pt; color: #111111;'>{item.price:.2f}</td>
+                <td style='padding: 8pt 2pt; text-align: left; font-weight: bold; font-size: 11pt; color: #000000;'>{subtotal:.2f}</td>
             </tr>
             """
             
         html = f"""
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #1e293b; padding: 4px; width: 100%;">
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; color: #000000; padding: 10pt; width: 100%; line-height: 1.5;">
             <!-- Header -->
-            <div style="text-align: center; border-bottom: 2px dashed #94a3b8; padding-bottom: 8px; margin-bottom: 10px;">
-                <h2 style="margin: 0; color: #0284c7; font-size: 15pt; font-weight: bold;">{shop_name}</h2>
-                <p style="margin: 3px 0; font-size: 9.5pt; color: #475569;">{shop_address}</p>
-                <p style="margin: 3px 0; font-size: 9.5pt; color: #475569;">📞 هاتف: {shop_phone}</p>
-                <div style="margin-top: 6px; font-size: 10.5pt; font-weight: bold; background-color: #f1f5f9; padding: 4px 10px; border-radius: 4px; display: inline-block; color: #0f172a;">
+            <div style="text-align: center; border-bottom: 3px double #000000; padding-bottom: 8pt; margin-bottom: 12pt;">
+                <span style="font-size: 18pt; font-weight: bold; display: block; margin-bottom: 4pt; color: #000000;">{shop_name}</span>
+                <span style="font-size: 10pt; display: block; margin-bottom: 2pt; color: #333333;">{shop_address}</span>
+                <span style="font-size: 10pt; display: block; color: #333333;">📞 هاتف: {shop_phone}</span>
+                
+                <div style="margin-top: 10pt; font-size: 12pt; font-weight: bold; border: 2px solid #000000; padding: 4pt 12pt; border-radius: 4pt; display: inline-block; color: #000000;">
                     فاتورة بيع #{inv.id}
                 </div>
-                <p style="margin: 3px 0; font-size: 9pt; color: #64748b;">التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</p>
+                <div style="margin-top: 6pt; font-size: 9.5pt; color: #444444;">التاريخ: {inv.date.strftime('%Y-%m-%d %H:%M')}</div>
             </div>
             
             <!-- Items Table -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 12pt;">
                 <thead>
-                    <tr style="color: #ffffff; background-color: #1e293b;">
-                        <th style="text-align: right; padding: 5px; font-weight: bold; font-size: 9.5pt; border-top-right-radius: 4px; border-bottom-right-radius: 4px;">الصنف</th>
-                        <th style="text-align: center; padding: 5px; font-weight: bold; font-size: 9.5pt; width: 45px;">الكمية</th>
-                        <th style="text-align: left; padding: 5px; font-weight: bold; font-size: 9.5pt; width: 55px;">السعر</th>
-                        <th style="text-align: left; padding: 5px; font-weight: bold; font-size: 9.5pt; width: 65px; border-top-left-radius: 4px; border-bottom-left-radius: 4px;">الإجمالي</th>
+                    <tr style="border-bottom: 2px solid #000000;">
+                        <th style="text-align: right; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000;">الصنف</th>
+                        <th style="text-align: center; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 45pt;">الكمية</th>
+                        <th style="text-align: left; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 55pt;">السعر</th>
+                        <th style="text-align: left; padding: 6pt 2pt; font-weight: bold; font-size: 10.5pt; color: #000000; width: 65pt;">الإجمالي</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1092,38 +1093,37 @@ class ReceiptDialog(QDialog):
                 </tbody>
             </table>
             
-            <!-- Totals layout -->
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-top: 8px; margin-bottom: 8px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 10.5pt;">
-                    <tr style="font-weight: bold; font-size: 12.5pt; color: #10b981;">
-                        <td style="text-align: right; padding: 2px 0;">صافي القيمة:</td>
-                        <td style="text-align: left; padding: 2px 0;">{inv.total:.2f} ل.س</td>
+            <!-- Totals Box -->
+            <div style="border-top: 1px dashed #000000; padding-top: 8pt; margin-top: 8pt; margin-bottom: 12pt;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
+                    <tr style="font-weight: bold; font-size: 14pt; color: #000000;">
+                        <td style="text-align: right; padding: 4pt 0;">صافي القيمة:</td>
+                        <td style="text-align: left; padding: 4pt 0;">{inv.total:.2f} ل.س</td>
                     </tr>
         """
         
         if self.paid > 0:
             html += f"""
-                    <tr style="color: #475569;">
-                        <td style="text-align: right; padding: 2px 0;">المدفوع:</td>
-                        <td style="text-align: left; padding: 2px 0;">{self.paid:.2f} ل.س</td>
+                    <tr style="font-size: 11pt; color: #222222;">
+                        <td style="text-align: right; padding: 4pt 0;">المدفوع:</td>
+                        <td style="text-align: left; padding: 4pt 0;">{self.paid:.2f} ل.س</td>
                     </tr>
-                    <tr style="font-weight: bold; color: #ef4444; border-top: 1px solid #e2e8f0;">
-                        <td style="text-align: right; padding: 4px 0 2px 0;">المتبقي:</td>
-                        <td style="text-align: left; padding: 4px 0 2px 0;">{self.remaining:.2f} ل.س</td>
+                    <tr style="font-weight: bold; font-size: 12pt; border-top: 1px dashed #000000; color: #000000;">
+                        <td style="text-align: right; padding: 6pt 0 4pt 0;">المتبقي:</td>
+                        <td style="text-align: left; padding: 6pt 0 4pt 0;">{self.remaining:.2f} ل.س</td>
                     </tr>
             """
             
         html += f"""
                 </table>
             </div>
-            
-            <!-- Customer Card -->
         """
         
         if inv.customer_name or inv.customer_phone or inv.customer_address:
             html += f"""
-            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-top: 8px; margin-bottom: 8px; font-size: 9.5pt; background-color: #f8fafc; line-height: 1.5;">
-                <div style="font-weight: bold; color: #0284c7; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 6px; font-size: 10pt;">👤 بيانات العميل والتوصيل</div>
+            <!-- Customer Box -->
+            <div style="border: 1.5px solid #000000; border-radius: 4pt; padding: 8pt; margin-top: 12pt; margin-bottom: 12pt; font-size: 10.5pt; line-height: 1.5; color: #000000;">
+                <div style="font-weight: bold; border-bottom: 1.5px solid #000000; padding-bottom: 4pt; margin-bottom: 6pt; font-size: 11pt; color: #000000;">👤 بيانات العميل والتوصيل</div>
             """
             if inv.customer_name:
                 html += f"<div><b>العميل:</b> {inv.customer_name}</div>"
@@ -1135,17 +1135,17 @@ class ReceiptDialog(QDialog):
             
         html += f"""
             <!-- Footer info -->
-            <div style="border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 6px; font-size: 9.5pt; color: #64748b; line-height: 1.4; text-align: center;">
-                <div>طريقة الدفع: <span style="font-weight: bold; color: #0f172a;">{inv.payment_method}</span></div>
+            <div style="border-top: 1px dashed #000000; padding-top: 8pt; margin-top: 8pt; font-size: 10.5pt; line-height: 1.4; text-align: center; color: #111111;">
+                <div>طريقة الدفع: <span style="font-weight: bold; color: #000000;">{inv.payment_method}</span></div>
             </div>
             
             <!-- Barcode decoration -->
-            <div style="text-align: center; margin-top: 12px; margin-bottom: 10px;">
-                <div style="display: inline-block; letter-spacing: 2px; font-family: monospace; font-size: 9pt; color: #64748b;">|||||||||||||||||||||||||||||||||</div>
-                <div style="font-size: 8.5pt; font-family: monospace; color: #64748b; margin-top: 2px;">INV-{inv.id}</div>
+            <div style="text-align: center; margin-top: 15pt; margin-bottom: 12pt;">
+                <div style="display: inline-block; letter-spacing: 2px; font-family: monospace; font-size: 10pt; color: #333333;">|||||||||||||||||||||||||||||||||</div>
+                <div style="font-size: 9pt; font-family: monospace; color: #333333; margin-top: 2px;">INV-{inv.id}</div>
             </div>
             
-            <div style="text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9.5pt; color: #475569; font-style: italic; font-weight: bold;">
+            <div style="text-align: center; border-top: 2px solid #000000; padding-top: 8pt; font-size: 10.5pt; color: #000000; font-style: italic; font-weight: bold;">
                 شكراً لزيارتكم وسعداء بخدمتكم!
             </div>
         </div>
@@ -1182,7 +1182,7 @@ class ReceiptDialog(QDialog):
                 # حساب الارتفاع الفعلي لمحتوى المستند بالنقاط
                 doc_height_px = doc.size().height()
                 doc_height_points = (doc_height_px / 96.0) * 72.0
-                height_points = doc_height_points + 30.0 # هامش أمان سفلي
+                height_points = doc_height_points + 40.0 # هامش أمان سفلي
                 if height_points < 250:
                     height_points = 250
                     
@@ -1196,9 +1196,16 @@ class ReceiptDialog(QDialog):
                 page_size = QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter)
                 printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, QMarginsF(0, 0, 0, 0)))
                 
-                # 3. الرسم المباشر 1:1 بدون أي تحجيم تلقائي من النظام
+                # 3. الرسم المباشر 1:1 مع التوسيط
                 painter = QPainter()
                 if painter.begin(printer):
+                    # حساب عرض الصفحة الفعلي بالنقاط من الطابعة وتوسيط الفاتورة
+                    printer_width_pts = printer.pageLayout().paintRect(QPageLayout.Unit.Point).width()
+                    offset_x = (printer_width_pts - width_points) / 2.0
+                    if offset_x < 0:
+                        offset_x = 0.0
+                    painter.translate(offset_x, 0.0)
+                    
                     doc.setPageSize(QSizeF(width_points, height_points))
                     doc.drawContents(painter)
                     painter.end()
@@ -1229,7 +1236,7 @@ class ReceiptDialog(QDialog):
         
         doc_height_px = doc.size().height()
         doc_height_points = (doc_height_px / 96.0) * 72.0
-        height_points = doc_height_points + 30.0
+        height_points = doc_height_points + 40.0
         if height_points < 250:
             height_points = 250
             
@@ -1243,6 +1250,12 @@ class ReceiptDialog(QDialog):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             painter = QPainter()
             if painter.begin(printer):
+                printer_width_pts = printer.pageLayout().paintRect(QPageLayout.Unit.Point).width()
+                offset_x = (printer_width_pts - width_points) / 2.0
+                if offset_x < 0:
+                    offset_x = 0.0
+                painter.translate(offset_x, 0.0)
+                
                 doc.setPageSize(QSizeF(width_points, height_points))
                 doc.drawContents(painter)
                 painter.end()
