@@ -1161,7 +1161,7 @@ class ReceiptDialog(QDialog):
             html += f"""
             <!-- Customer Box -->
             <div style="border: 2px solid black; border-radius: 4pt; padding: 12pt; margin-top: 15pt; margin-bottom: 15pt; font-size: 11pt; line-height: 1.6; color: black;">
-                <div style="font-weight: bold; border-bottom: 2px solid black; padding-bottom: 6pt; margin-bottom: 8pt; font-size: 12pt; color: black;">بيانات العميل والتوص</div>
+                <div style="font-weight: bold; border-bottom: 2px solid black; padding-bottom: 6pt; margin-bottom: 8pt; font-size: 12pt; color: black;">بيانات العميل والتوصيل</div>
             """
             if inv.customer_name:
                 html += f"<div><b>العميل:</b> {inv.customer_name}</div>"
