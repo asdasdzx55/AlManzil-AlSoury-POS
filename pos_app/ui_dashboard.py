@@ -885,6 +885,8 @@ class POSPage(QWidget):
                 
         self.table.blockSignals(False)
         self.update_cart_table()
+        self.barcode_input.setFocus()
+        self.barcode_input.selectAll()
 
     def update_total_amount(self):
         total = sum(item['price'] * item['qty'] for item in self.cart.values())
@@ -1760,6 +1762,8 @@ class PurchasesPage(QWidget):
                 
         self.table.blockSignals(False)
         self.update_table()
+        self.barcode_input.setFocus()
+        self.barcode_input.selectAll()
 
     def checkout_purchase(self):
         if not self.cart:
