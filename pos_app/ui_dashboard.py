@@ -326,7 +326,7 @@ class POSPage(QWidget):
         # جدول المنتجات
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "القطع", "الوزن (جرام/كجم)", "الإجمالي"])
+        self.table.setHorizontalHeaderLabels(["كود الصنف", "اسم الصنف", "سعر البيع", "الكمية", "الوزن", "إجمالي السعر"])
         self.table.setShowGrid(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
