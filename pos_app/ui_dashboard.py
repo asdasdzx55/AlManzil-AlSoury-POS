@@ -297,90 +297,91 @@ class POSPage(QWidget):
         self.setup_shortcuts()
 
     def init_ui(self):
-        # تصميم عمودي بالكامل
-        layout = QVBoxLayout()
-        layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(6)
+        # تخطيط أفقي من عمودين
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(6, 6, 6, 6)
+        main_layout.setSpacing(12)
         
-        # 1. القسم العلوي (الباركود والأزرار الفرعية)
-        top_layout = QHBoxLayout()
-        top_layout.setSpacing(6)
+        # =====================================================================
+        # العمود الأيمن (جدول الفاتورة والبحث والباركود) - 65% من العرض
+        # =====================================================================
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(8)
+        
+        # الباركود والبحث
+        search_layout = QHBoxLayout()
+        search_layout.setSpacing(6)
         
         self.barcode_input = QLineEdit()
         self.barcode_input.setPlaceholderText("امسح الباركود أو اكتب اسم الصنف هنا... (F1 للبحث)")
-        self.barcode_input.setMinimumHeight(32)
+        self.barcode_input.setMinimumHeight(38)
+        self.barcode_input.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.barcode_input.returnPressed.connect(self.add_by_barcode)
         
         btn_search = QPushButton("🔍 بحث متقدم (F1)")
-        btn_search.setStyleSheet("background-color: #34495e; padding: 6px 12px;")
+        btn_search.setStyleSheet("background-color: #3b82f6; color: white; padding: 8px 15px;")
         btn_search.clicked.connect(self.open_search_dialog)
         
-        btn_hold = QPushButton("⏸️ تعليق الفاتورة (F3)")
-        btn_hold.setStyleSheet("background-color: #e67e22; padding: 6px 12px;")
-        btn_hold.clicked.connect(self.hold_invoice)
+        search_layout.addWidget(self.barcode_input, 4)
+        search_layout.addWidget(btn_search, 1)
+        right_layout.addLayout(search_layout)
         
-        btn_recall = QPushButton("▶️ استدعاء المعلقات (F4)")
-        btn_recall.setStyleSheet("background-color: #3498db; padding: 6px 12px;")
-        btn_recall.clicked.connect(self.recall_invoice)
-        
-        btn_clear = QPushButton("🗑️ تفريغ السلة")
-        btn_clear.setObjectName("dangerButton")
-        btn_clear.setStyleSheet("background-color: #e74c3c; padding: 6px 12px;")
-        btn_clear.clicked.connect(self.clear_cart)
-        
-        top_layout.addWidget(self.barcode_input, 4)
-        top_layout.addWidget(btn_search, 1)
-        top_layout.addWidget(btn_hold, 1)
-        top_layout.addWidget(btn_recall, 1)
-        top_layout.addWidget(btn_clear, 1)
-        
-        layout.addLayout(top_layout)
-        
-        # قسم الكميات المتاحة على غرار النظام القديم ليصبح مألوفاً للمستخدم
-        self.stock_group = QGroupBox("الكميات المتاحة للمنتج المحدد")
-        self.stock_group.setObjectName("stockGroup")
-        self.stock_group.setMinimumHeight(45)
-        stock_layout = QHBoxLayout(self.stock_group)
-        stock_layout.setContentsMargins(10, 4, 10, 4)
-        stock_layout.setSpacing(10)
-        
-        lbl_avail_title = QLabel("📦 الكمية المتوفرة في المخزن:")
-        lbl_avail_title.setStyleSheet("font-weight: bold; color: #e74c3c; font-size: 14px;")
-        
-        self.lbl_box_title = QLabel("الكرتونة / العبوة:")
-        self.lbl_avail_box = QLabel("-")
-        self.lbl_avail_box.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71; background-color: #2c3e50; padding: 2px 10px; border-radius: 4px;")
-        
-        self.lbl_unit_title = QLabel("القطع / الوزن:")
-        self.lbl_avail_unit = QLabel("-")
-        self.lbl_avail_unit.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71; background-color: #2c3e50; padding: 2px 10px; border-radius: 4px;")
-        
-        stock_layout.addWidget(lbl_avail_title)
-        stock_layout.addWidget(self.lbl_box_title)
-        stock_layout.addWidget(self.lbl_avail_box)
-        stock_layout.addWidget(self.lbl_unit_title)
-        stock_layout.addWidget(self.lbl_avail_unit)
-        stock_layout.addStretch()
-        
-        layout.addWidget(self.stock_group)
-        
-        # 2. القسم الأوسط (الجدول بعرض الشاشة بالكامل)
+        # جدول المنتجات
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "القطع", "الوزن (جرام/كجم)", "الإجمالي"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
         self.table.itemSelectionChanged.connect(self.on_selection_changed)
-        layout.addWidget(self.table)
+        right_layout.addWidget(self.table)
         
-        # 3. القسم السفلي (بيانات العميل، طريقة الدفع، الإجمالي وزر الدفع بشكل أفقي متناسق)
-        bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(10)
+        # =====================================================================
+        # العمود الأيسر (شاشة الحساب، العميل، الدفع والعمليات) - 35% من العرض
+        # =====================================================================
+        left_widget = QWidget()
+        left_widget.setStyleSheet("background-color: #111827; border-radius: 12px; border: 1px solid #1f2937;")
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(12, 12, 12, 12)
+        left_layout.setSpacing(10)
         
-        # حقول العميل بشكل مدمج
-        cust_group = QGroupBox("بيانات العميل / الأوردر")
-        cust_layout = QHBoxLayout(cust_group)
-        cust_layout.setContentsMargins(8, 4, 8, 4)
+        # 1. شاشة المبيعات (العداد الرقمي للمجموع)
+        screen_widget = QWidget()
+        screen_widget.setStyleSheet("background-color: #0b0f19; border-radius: 10px; border: 1px solid #1f2937;")
+        screen_layout = QVBoxLayout(screen_widget)
+        screen_layout.setContentsMargins(8, 12, 8, 12)
+        
+        self.total_label = QLabel("صافي القيمة\n0.00 ج.م")
+        self.total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.total_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #10b981; line-height: 1.4;")
+        screen_layout.addWidget(self.total_label)
+        left_layout.addWidget(screen_widget)
+        
+        # 2. تفاصيل المخزون للمنتج المحدد
+        self.stock_group = QGroupBox("الكميات المتاحة للمنتج")
+        self.stock_group.setObjectName("stockGroup")
+        self.stock_group.setMinimumHeight(70)
+        stock_layout = QFormLayout(self.stock_group)
+        stock_layout.setContentsMargins(10, 6, 10, 6)
+        stock_layout.setSpacing(6)
+        
+        self.lbl_avail_box = QLabel("-")
+        self.lbl_avail_box.setStyleSheet("font-size: 14px; font-weight: bold; color: #10b981;")
+        self.lbl_avail_unit = QLabel("-")
+        self.lbl_avail_unit.setStyleSheet("font-size: 14px; font-weight: bold; color: #10b981;")
+        
+        self.lbl_box_title = QLabel("الكرتونة / العبوة:")
+        self.lbl_unit_title = QLabel("القطع / الوزن:")
+        
+        stock_layout.addRow(self.lbl_box_title, self.lbl_avail_box)
+        stock_layout.addRow(self.lbl_unit_title, self.lbl_avail_unit)
+        left_layout.addWidget(self.stock_group)
+        
+        # 3. بيانات العميل والتوصيل
+        cust_group = QGroupBox("بيانات العميل والتوصيل")
+        cust_layout = QVBoxLayout(cust_group)
+        cust_layout.setContentsMargins(10, 6, 10, 6)
         cust_layout.setSpacing(6)
         
         self.cust_name = QLineEdit()
@@ -402,54 +403,63 @@ class POSPage(QWidget):
         cust_layout.addWidget(self.cust_phone)
         cust_layout.addWidget(self.cust_address)
         cust_layout.addWidget(self.combo_delivery)
+        left_layout.addWidget(cust_group)
         
-        # طريقة الدفع
-        payment_group = QGroupBox("طريقة الدفع")
-        payment_layout = QHBoxLayout(payment_group)
-        payment_layout.setContentsMargins(8, 4, 8, 4)
+        # 4. طريقة الدفع والحساب
+        pay_group = QGroupBox("طريقة الدفع والحساب")
+        pay_layout = QFormLayout(pay_group)
+        pay_layout.setContentsMargins(10, 6, 10, 6)
+        pay_layout.setSpacing(8)
+        
         self.payment_method = QComboBox()
         self.payment_method.addItems(["نقدي (Cash)", "فيزا (Visa)", "إنستا باي (InstaPay)", "فودافون كاش"])
-        self.payment_method.setMinimumHeight(28)
-        payment_layout.addWidget(self.payment_method)
-        
-        # الإجمالي الإجمالي والدفع
-        summary_group = QGroupBox("الحساب والمدفوعات")
-        summary_layout = QVBoxLayout(summary_group)
-        summary_layout.setContentsMargins(8, 6, 8, 6)
-        summary_layout.setSpacing(4)
-        
-        self.total_label = QLabel("صافي القيمة: 0.00 ج.م")
-        self.total_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2ecc71;")
-        
-        form_layout = QFormLayout()
-        form_layout.setSpacing(6)
         
         self.input_paid = QLineEdit()
         self.input_paid.setPlaceholderText("أدخل المبلغ المدفوع...")
-        self.input_paid.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
+        self.input_paid.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.input_paid.textChanged.connect(self.calculate_change)
         
         self.lbl_change = QLabel("0.00 ج.م")
-        self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
+        self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #ef4444;")
         
-        form_layout.addRow("المدفوع:", self.input_paid)
-        form_layout.addRow("المتبقي:", self.lbl_change)
+        pay_layout.addRow("طريقة الدفع:", self.payment_method)
+        pay_layout.addRow("المدفوع:", self.input_paid)
+        pay_layout.addRow("المتبقي:", self.lbl_change)
+        left_layout.addWidget(pay_group)
         
-        btn_pay = QPushButton("💳 دفع وإنهاء (F5)")
-        btn_pay.setStyleSheet("background-color: #2ecc71; color: white; font-size: 16px; padding: 8px 20px; font-weight: bold;")
-        btn_pay.setMinimumHeight(40)
+        # 5. أزرار العمليات والتحكم السريعة
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(6)
+        
+        btn_hold = QPushButton("⏸️ تعليق (F3)")
+        btn_hold.setStyleSheet("background-color: #e67e22; color: white;")
+        btn_hold.clicked.connect(self.hold_invoice)
+        
+        btn_recall = QPushButton("▶️ معلقات (F4)")
+        btn_recall.setStyleSheet("background-color: #3498db; color: white;")
+        btn_recall.clicked.connect(self.recall_invoice)
+        
+        btn_clear = QPushButton("🗑️ تفريغ")
+        btn_clear.setObjectName("dangerButton")
+        btn_clear.clicked.connect(self.clear_cart)
+        
+        actions_layout.addWidget(btn_hold)
+        actions_layout.addWidget(btn_recall)
+        actions_layout.addWidget(btn_clear)
+        left_layout.addLayout(actions_layout)
+        
+        # 6. زر الدفع والإنهاء (F5)
+        btn_pay = QPushButton("💳 دفع وإنهاء الفاتورة (F5)")
+        btn_pay.setStyleSheet("background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: white; font-size: 16px; font-weight: bold; padding: 10px;")
+        btn_pay.setMinimumHeight(44)
         btn_pay.clicked.connect(self.checkout)
+        left_layout.addWidget(btn_pay)
         
-        summary_layout.addWidget(self.total_label)
-        summary_layout.addLayout(form_layout)
-        summary_layout.addWidget(btn_pay)
+        # دمج الأعمدة في المخطط الرئيسي
+        main_layout.addWidget(right_widget, 65)
+        main_layout.addWidget(left_widget, 35)
         
-        bottom_layout.addWidget(cust_group, 4)
-        bottom_layout.addWidget(payment_group, 2)
-        bottom_layout.addWidget(summary_group, 3)
-        
-        layout.addLayout(bottom_layout)
-        self.setLayout(layout)
+        self.setLayout(main_layout)
 
     def load_delivery_employees(self):
         self.combo_delivery.clear()
@@ -590,7 +600,7 @@ class POSPage(QWidget):
             self.table.setItem(row, 4, q_weight)
             self.table.setItem(row, 5, s_item)
             
-        self.total_label.setText(f"صافي القيمة: {total:.2f} ج.م")
+        self.total_label.setText(f"صافي القيمة\n{total:.2f} ج.م")
         self.calculate_change()
         self.table.blockSignals(False)
 
@@ -866,7 +876,7 @@ class POSPage(QWidget):
 
     def update_total_amount(self):
         total = sum(item['price'] * item['qty'] for item in self.cart.values())
-        self.total_label.setText(f"الإجمالي: {total:.2f} ج.م")
+        self.total_label.setText(f"صافي القيمة\n{total:.2f} ج.م")
 
     def hold_invoice(self):
         if not self.cart:
