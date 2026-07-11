@@ -6,7 +6,7 @@
 /* Main Widget Background */
 QWidget {
     background-color: #f8fafc;
-    font-family: 'Cairo', 'Segoe UI', Arial, sans-serif;
+    font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
     font-size: 13px;
     color: #334155;
 }
@@ -137,19 +137,18 @@ QGroupBox#stockGroup QLabel {
 /* Tables styling */
 QTableWidget {
     background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 12px;
-    gridline-color: #f1f5f9;
+    gridline-color: #cbd5e1;
     color: #1e293b;
 }
 
 QHeaderView::section {
     background-color: #f8fafc;
     padding: 12px;
-    border: none;
-    border-bottom: 2px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     font-weight: bold;
-    color: #475569;
+    color: #1e293b;
 }
 
 QTableWidget::item {

@@ -327,6 +327,7 @@ class POSPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["الباركود", "اسم المنتج", "سعر البيع", "القطع", "الوزن (جرام/كجم)", "الإجمالي"])
+        self.table.setShowGrid(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.cellChanged.connect(self.on_cell_changed)
         self.table.itemSelectionChanged.connect(self.on_selection_changed)
@@ -1092,12 +1093,11 @@ class ReceiptDialog(QDialog):
             qty_str = f"{item.quantity:.3f}" if item.product.is_weighted else str(int(item.quantity))
             items_html += f"""
             <tr>
-                <td style='padding: 12pt 2pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border-bottom: 1px dashed black; width: 42%;'>{item.product.name}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 12%;'>{qty_str}</td>
-                <td style='padding: 12pt 2pt; text-align: center; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 23%;'>{item.price:.2f}</td>
-                <td style='padding: 12pt 2pt; text-align: left; font-weight: bold; font-size: 10.5pt; color: black; border-bottom: 1px dashed black; width: 23%;'>{subtotal:.2f}</td>
+                <td style='padding: 10pt 4pt; text-align: right; font-size: 11pt; font-weight: bold; color: black; border: 1px solid black; width: 42%;'>{item.product.name}</td>
+                <td style='padding: 10pt 4pt; text-align: center; font-size: 10.5pt; color: black; border: 1px solid black; width: 12%;'>{qty_str}</td>
+                <td style='padding: 10pt 4pt; text-align: center; font-size: 10.5pt; color: black; border: 1px solid black; width: 23%;'>{item.price:.2f}</td>
+                <td style='padding: 10pt 4pt; text-align: left; font-weight: bold; font-size: 10.5pt; color: black; border: 1px solid black; width: 23%;'>{subtotal:.2f}</td>
             </tr>
-            <tr style='height: 8pt;'><td colspan='4' style='border: none; padding: 0;'></td></tr>
             """
             
         # توليد كود الـ QR الخاص بموقع المحل برمجياً في الذاكرة بصيغة Base64
@@ -1142,14 +1142,14 @@ class ReceiptDialog(QDialog):
             
             <div style="border-top: 3px double black; height: 5pt; margin-bottom: 10pt;"></div>
             
-            <!-- Items Table -->
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15pt;">
+            <!-- Items Table (Fully Bordered Grid) -->
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid black; margin-bottom: 15pt;">
                 <thead>
                     <tr>
-                        <th style="text-align: right; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 42%; border-bottom: 2px solid black;">الصنف</th>
-                        <th style="text-align: center; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 12%; border-bottom: 2px solid black;">الكمية</th>
-                        <th style="text-align: center; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 23%; border-bottom: 2px solid black;">السعر</th>
-                        <th style="text-align: left; padding: 8pt 2pt; font-weight: bold; font-size: 11pt; color: black; width: 23%; border-bottom: 2px solid black;">الإجمالي</th>
+                        <th style="text-align: right; padding: 8pt 4pt; font-weight: bold; font-size: 11pt; color: black; width: 42%; border: 1px solid black; background-color: #f0f0f0;">الصنف</th>
+                        <th style="text-align: center; padding: 8pt 4pt; font-weight: bold; font-size: 11pt; color: black; width: 12%; border: 1px solid black; background-color: #f0f0f0;">الكمية</th>
+                        <th style="text-align: center; padding: 8pt 4pt; font-weight: bold; font-size: 11pt; color: black; width: 23%; border: 1px solid black; background-color: #f0f0f0;">السعر</th>
+                        <th style="text-align: left; padding: 8pt 4pt; font-weight: bold; font-size: 11pt; color: black; width: 23%; border: 1px solid black; background-color: #f0f0f0;">الإجمالي</th>
                     </tr>
                 </thead>
                 <tbody>
