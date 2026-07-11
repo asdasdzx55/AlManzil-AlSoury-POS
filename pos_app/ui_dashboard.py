@@ -100,12 +100,6 @@ class DashboardWindow(QWidget):
         
         sidebar_layout.addStretch()
         
-        # زر تبديل المظهر (ليلي / مضيء)
-        self.btn_theme = QPushButton("☀️")
-        self.btn_theme.setToolTip("تفعيل المود المضيء")
-        self.btn_theme.clicked.connect(self.toggle_theme)
-        sidebar_layout.addWidget(self.btn_theme)
-        
         # زر تسجيل الخروج
         btn_logout = QPushButton("🚪")
         btn_logout.setToolTip("تسجيل الخروج")
@@ -179,8 +173,9 @@ class DashboardWindow(QWidget):
             with open(style_path, "r", encoding="utf-8") as f:
                 QApplication.instance().setStyleSheet(f.read())
                 
-        self.btn_theme.setText("☀️" if self.dark_mode else "🌙")
-        self.btn_theme.setToolTip("تفعيل المود المضيء" if self.dark_mode else "تفعيل المود الليلي")
+        # تحديث نص الزر بداخل الإعدادات إذا تم فتحها
+        if hasattr(self, 'page_settings') and hasattr(self.page_settings, 'btn_theme_settings'):
+            self.page_settings.btn_theme_settings.setText("🌙 تفعيل المظهر المضيء" if self.dark_mode else "☀️ تفعيل المظهر الليلي")
 
 
 # ==================== DIALOGS FOR POS ====================
@@ -500,21 +495,35 @@ class POSPage(QWidget):
         if not barcode:
             return
             
+        # فك باركود الميزان الإلكتروني (Scale Barcode EAN-13)
+        # الصيغة القياسية: PPCCCCCWWWWWX
+        # حيث PP بادئة الميزان (20 إلى 25 أو 99)، CCCCC كود الصنف من 5 أرقام، WWWWW الوزن بالجرامات، X الرقم التحقيقي
+        weight_from_scale = None
+        lookup_barcode = barcode
+        if len(barcode) == 13 and (barcode.startswith("20") or barcode.startswith("21") or barcode.startswith("22") or barcode.startswith("23") or barcode.startswith("24") or barcode.startswith("25") or barcode.startswith("99")):
+            try:
+                product_code = barcode[2:7] # الـ 5 أرقام الداخلية للمنتج
+                weight_grams = int(barcode[7:12])
+                weight_from_scale = weight_grams / 1000.0 # تحويل إلى كيلوغرام
+                lookup_barcode = product_code
+            except Exception as e:
+                print(f"Error parsing scale barcode: {e}")
+                
         from database import ProductBarcode
         session = get_session()
         
         # 1. البحث أولاً في الباركود الرئيسي لجدول المنتجات
-        product = session.query(Product).filter_by(barcode=barcode).first()
+        product = session.query(Product).filter_by(barcode=lookup_barcode).first()
         
         # 2. إذا لم يعثر عليه، نبحث في جدول الباركودات الفرعية البديلة
         if not product:
-            barcode_entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            barcode_entry = session.query(ProductBarcode).filter_by(barcode=lookup_barcode).first()
             if barcode_entry:
                 product = barcode_entry.product
                 
         # 3. إذا لم يعثر عليه، نبحث بالاسم كخيار أخير
         if not product:
-            product = session.query(Product).filter_by(name=barcode).first()
+            product = session.query(Product).filter_by(name=lookup_barcode).first()
             
         if product:
             # تحديد الكمية المتاحة (سواء له أو لمنتجه الأب إذا كان علبة)
@@ -527,6 +536,10 @@ class POSPage(QWidget):
             # تحديث عرض الكميات المتاحة في الواجهة
             self.display_available_qty(product, session)
             
+            qty_to_add = weight_from_scale if (weight_from_scale is not None) else (0.1 if product.is_weighted else 1.0)
+            if weight_from_scale is None:
+                qty_to_add = 1.0
+            
             if available_qty <= 0:
                 QMessageBox.warning(self, "تنبيه", "هذا المنتج غير متوفر في المخزن")
                 session.close()
@@ -535,9 +548,8 @@ class POSPage(QWidget):
             cart_key = f"prod_{product.id}"
             
             if cart_key in self.cart:
-                step = 0.1 if product.is_weighted else 1.0
-                if self.cart[cart_key]['qty'] + step <= available_qty:
-                    self.cart[cart_key]['qty'] += step
+                if self.cart[cart_key]['qty'] + qty_to_add <= available_qty:
+                    self.cart[cart_key]['qty'] += qty_to_add
                 else:
                     QMessageBox.warning(self, "تنبيه", "الكمية المطلوبة تتجاوز المتاح في المخزن")
             else:
@@ -545,11 +557,11 @@ class POSPage(QWidget):
                     'id': product.id,
                     'name': product.name,
                     'price': product.price,
-                    'qty': 1.0 if product.is_weighted else 1.0,
+                    'qty': qty_to_add,
                     'is_weighted': product.is_weighted,
                     'parent_id': product.parent_id,
                     'units_in_box': product.units_in_box,
-                    'barcode': barcode
+                    'barcode': lookup_barcode
                 }
             self.barcode_input.clear()
             self.update_cart_table()
@@ -1003,6 +1015,15 @@ class POSPage(QWidget):
         finally:
             session.close()
 
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+            focused = self.focusWidget()
+            if focused and focused != self.barcode_input and not isinstance(focused, QPushButton):
+                self.focusNextChild()
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
 
 # ==================== RECEIPT DIALOG ====================
 class ReceiptDialog(QDialog):
@@ -1397,7 +1418,7 @@ class QuickProductDialog(QDialog):
         session.close()
 
     def save_product(self):
-        barcode = self.input_barcode.text().strip()
+        barcode_input_text = self.input_barcode.text().strip()
         name = self.input_name.text().strip()
         cost = self.input_cost.value()
         price = self.input_price.value()
@@ -1408,7 +1429,8 @@ class QuickProductDialog(QDialog):
             QMessageBox.warning(self, "تنبيه", "يرجى تعبئة جميع الحقول المطلوبة")
             return
             
-        if not barcode:
+        barcodes_list = [b.strip() for b in barcode_input_text.split(",") if b.strip()]
+        if not barcodes_list:
             # توليد باركود محلي من 5 أرقام تلقائياً
             session = get_session()
             from database import Product
@@ -1418,18 +1440,22 @@ class QuickProductDialog(QDialog):
                     val = int(p.barcode)
                     if val > max_val:
                         max_val = val
-            barcode = str(max_val + 1)
+            main_barcode = str(max_val + 1)
             session.close()
+            extra_barcodes = []
+        else:
+            main_barcode = barcodes_list[0]
+            extra_barcodes = barcodes_list[1:]
             
         session = get_session()
         from database import ProductBarcode
         
         # 1. البحث في الباركود الرئيسي
-        prod = session.query(Product).filter_by(barcode=barcode).first()
+        prod = session.query(Product).filter_by(barcode=main_barcode).first()
         
         # 2. البحث في الباركودات البديلة
         if not prod:
-            entry = session.query(ProductBarcode).filter_by(barcode=barcode).first()
+            entry = session.query(ProductBarcode).filter_by(barcode=main_barcode).first()
             if entry:
                 prod = entry.product
                 
@@ -1439,9 +1465,14 @@ class QuickProductDialog(QDialog):
             prod.price = price
             prod.is_weighted = is_weighted
             prod.subcategory_id = subcat_id
-            # تحديث الباركود الرئيسي في حال كان الباركود الحالي هو الأساسي
-            if prod.barcode == barcode:
-                pass
+            
+            # تحديث الباركودات الإضافية: مسح القديمة وإضافة الجديدة
+            session.query(ProductBarcode).filter_by(product_id=prod.id).delete()
+            for bc in extra_barcodes:
+                existing = session.query(ProductBarcode).filter_by(barcode=bc).first()
+                if existing: continue
+                new_bc = ProductBarcode(product_id=prod.id, barcode=bc)
+                session.add(new_bc)
         else:
             prod = Product(
                 name=name, 
@@ -1450,9 +1481,17 @@ class QuickProductDialog(QDialog):
                 quantity=0.0, 
                 is_weighted=is_weighted, 
                 subcategory_id=subcat_id,
-                barcode=barcode
+                barcode=main_barcode
             )
             session.add(prod)
+            session.flush() # للحصول على المعرف تلقائياً
+            
+            # إضافة الباركودات الإضافية
+            for bc in extra_barcodes:
+                existing = session.query(ProductBarcode).filter_by(barcode=bc).first()
+                if existing: continue
+                new_bc = ProductBarcode(product_id=prod.id, barcode=bc)
+                session.add(new_bc)
             
         session.commit()
         session.close()
@@ -1902,6 +1941,16 @@ class EditProductDialog(QDialog):
             self.accept()
         session.close()
 
+    def keyPressEvent(self, event):
+        # منع إغلاق الديالوج بإنتر والانتقال للخانة التالية
+        if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+            focused = self.focusWidget()
+            if focused and not isinstance(focused, QPushButton) and not isinstance(focused, QDialogButtonBox):
+                self.focusNextChild()
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
 
 # ==================== PAGE 2: INVENTORY / PRODUCTS ====================
 class InventoryPage(QWidget):
@@ -2210,6 +2259,15 @@ class InventoryPage(QWidget):
         session.close()
         self.input_sub_name.clear()
         self.load_categories_lists()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
+            focused = self.focusWidget()
+            if focused and not isinstance(focused, QPushButton):
+                self.focusNextChild()
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
 
 # ==================== PAGE 3: SUPPLIERS ====================
@@ -2680,16 +2738,19 @@ class ReportsPage(QWidget):
         self.tab_sales = QWidget()
         self.tab_purchases = QWidget()
         self.tab_expenses = QWidget()
+        self.tab_analytics = QWidget()
         
         self.tabs.addTab(self.tab_dashboard, "📊 لوحة الأرباح والرسوم البيانية")
         self.tabs.addTab(self.tab_sales, "🛒 سجل المبيعات والفواتير")
         self.tabs.addTab(self.tab_purchases, "📥 سجل حركات المشتريات")
         self.tabs.addTab(self.tab_expenses, "💸 إدارة وتسجيل المصاريف")
+        self.tabs.addTab(self.tab_analytics, "📈 إحصائيات الأصناف والأكثر مبيعاً")
         
         self.setup_dashboard_tab()
         self.setup_sales_tab()
         self.setup_purchases_tab()
         self.setup_expenses_tab()
+        self.setup_analytics_tab()
         
         layout.addWidget(self.tabs)
         self.setLayout(layout)
@@ -2792,6 +2853,46 @@ class ReportsPage(QWidget):
         
         self.tab_expenses.setLayout(layout)
 
+    def setup_analytics_tab(self):
+        main_layout = QHBoxLayout()
+        main_layout.setSpacing(15)
+        
+        # 1. الأكثر مبيعاً
+        group_top = QGroupBox("🔥 الأصناف الأكثر مبيعاً والأعلى ربحاً")
+        layout_top = QVBoxLayout(group_top)
+        self.table_top_products = QTableWidget()
+        self.table_top_products.setColumnCount(3)
+        self.table_top_products.setHorizontalHeaderLabels(["اسم المنتج", "الكمية المباعة", "إجمالي الإيراد"])
+        self.table_top_products.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout_top.addWidget(self.table_top_products)
+        
+        # 2. طرق الدفع والشركاء
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(15)
+        
+        group_pay = QGroupBox("💳 إحصائيات طرق الدفع المستخدمة")
+        layout_pay = QVBoxLayout(group_pay)
+        self.table_payment_methods = QTableWidget()
+        self.table_payment_methods.setColumnCount(3)
+        self.table_payment_methods.setHorizontalHeaderLabels(["طريقة الدفع", "عدد الفواتير", "إجمالي المبالغ"])
+        self.table_payment_methods.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout_pay.addWidget(self.table_payment_methods)
+        
+        group_withdr = QGroupBox("💸 إجمالي مسحوبات النقدية للشركاء")
+        layout_withdr = QVBoxLayout(group_withdr)
+        self.table_partners_withdrawals = QTableWidget()
+        self.table_partners_withdrawals.setColumnCount(2)
+        self.table_partners_withdrawals.setHorizontalHeaderLabels(["الشريك", "إجمالي المسحوبات خلال الفترة"])
+        self.table_partners_withdrawals.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout_withdr.addWidget(self.table_partners_withdrawals)
+        
+        left_layout.addWidget(group_pay)
+        left_layout.addWidget(group_withdr)
+        
+        main_layout.addWidget(group_top, 3)
+        main_layout.addLayout(left_layout, 2)
+        self.tab_analytics.setLayout(main_layout)
+
     def save_expense(self):
         amount = self.input_exp_amount.value()
         category = self.combo_exp_cat.currentText()
@@ -2888,6 +2989,63 @@ class ReportsPage(QWidget):
             self.table_expenses.setItem(row, 1, QTableWidgetItem(exp.category))
             self.table_expenses.setItem(row, 2, QTableWidgetItem(exp.date.strftime("%Y-%m-%d %H:%M")))
             self.table_expenses.setItem(row, 3, QTableWidgetItem(exp.note if exp.note else ""))
+            
+        # --- تحليلات متقدمة (الأكثر مبيعاً، طرق الدفع، والشركاء) ---
+        from sqlalchemy import func
+        from database import Partner, PartnerWithdrawal, Product
+        
+        # 1. الأكثر مبيعاً
+        top_products = session.query(
+            InvoiceItem.product_id,
+            func.sum(InvoiceItem.quantity).label('total_qty'),
+            func.sum(InvoiceItem.price * InvoiceItem.quantity).label('total_rev')
+        ).join(Invoice).filter(Invoice.date >= datetime_from, Invoice.date <= datetime_to)\
+         .group_by(InvoiceItem.product_id)\
+         .order_by(func.sum(InvoiceItem.quantity).desc())\
+         .limit(15).all()
+         
+        self.table_top_products.setRowCount(0)
+        for prod_id, qty, rev in top_products:
+            prod = session.query(Product).get(prod_id)
+            if prod:
+                row = self.table_top_products.rowCount()
+                self.table_top_products.insertRow(row)
+                self.table_top_products.setItem(row, 0, QTableWidgetItem(prod.name))
+                qty_str = f"{qty:.3f}" if prod.is_weighted else str(int(qty))
+                self.table_top_products.setItem(row, 1, QTableWidgetItem(qty_str))
+                self.table_top_products.setItem(row, 2, QTableWidgetItem(f"{rev:.2f} ج.م"))
+                
+        # 2. طرق الدفع
+        payment_stats = session.query(
+            Invoice.payment_method,
+            func.count(Invoice.id).label('inv_count'),
+            func.sum(Invoice.total).label('total_amount')
+        ).filter(Invoice.date >= datetime_from, Invoice.date <= datetime_to)\
+         .group_by(Invoice.payment_method).all()
+         
+        self.table_payment_methods.setRowCount(0)
+        for method, count, amt in payment_stats:
+            row = self.table_payment_methods.rowCount()
+            self.table_payment_methods.insertRow(row)
+            self.table_payment_methods.setItem(row, 0, QTableWidgetItem(method))
+            self.table_payment_methods.setItem(row, 1, QTableWidgetItem(str(count)))
+            self.table_payment_methods.setItem(row, 2, QTableWidgetItem(f"{amt:.2f} ج.م"))
+            
+        # 3. مسحوبات الشركاء
+        partner_stats = session.query(
+            PartnerWithdrawal.partner_id,
+            func.sum(PartnerWithdrawal.amount).label('total_withdrawn')
+        ).filter(PartnerWithdrawal.date >= datetime_from, PartnerWithdrawal.date <= datetime_to)\
+         .group_by(PartnerWithdrawal.partner_id).all()
+         
+        self.table_partners_withdrawals.setRowCount(0)
+        for part_id, total_withdrawn in partner_stats:
+            partner = session.query(Partner).get(part_id)
+            if partner:
+                row = self.table_partners_withdrawals.rowCount()
+                self.table_partners_withdrawals.insertRow(row)
+                self.table_partners_withdrawals.setItem(row, 0, QTableWidgetItem(partner.name))
+                self.table_partners_withdrawals.setItem(row, 1, QTableWidgetItem(f"{total_withdrawn:.2f} ج.م"))
             
         session.close()
 
@@ -3636,6 +3794,11 @@ class SettingsPage(QWidget):
         self.combo_paper_width.setMinimumHeight(35)
         self.combo_paper_width.addItems(["80mm (كبير)", "58mm (صغير)"])
         
+        # خيار تبديل المظهر
+        self.btn_theme_settings = QPushButton("🌙 تفعيل المظهر المضيء")
+        self.btn_theme_settings.setStyleSheet("background-color: #3b82f6; color: white; font-weight: bold;")
+        self.btn_theme_settings.clicked.connect(self.trigger_theme_toggle)
+        
         btn_save = QPushButton("حفظ إعدادات المتجر 💾")
         btn_save.clicked.connect(self.save_settings)
         btn_save.setStyleSheet("background-color: #2c3e50; color: white; font-weight: bold; font-size: 14px; padding: 10px;")
@@ -3646,9 +3809,17 @@ class SettingsPage(QWidget):
         layout.addRow("موقع المحل الإلكتروني (QR):", self.input_shop_website)
         layout.addRow("طابعة الريسيت الافتراضية:", self.combo_printers)
         layout.addRow("عرض ورق ريسيت الكاشير:", self.combo_paper_width)
+        layout.addRow("مظهر النظام (ثيم):", self.btn_theme_settings)
         layout.addRow("", btn_save)
         
         self.tab_info.setLayout(layout)
+
+    def trigger_theme_toggle(self):
+        parent = self.parent()
+        while parent and not hasattr(parent, 'toggle_theme'):
+            parent = parent.parent()
+        if parent:
+            parent.toggle_theme()
 
     def load_settings(self):
         session = get_session()
@@ -3674,6 +3845,13 @@ class SettingsPage(QWidget):
             if idx >= 0:
                 self.combo_paper_width.setCurrentIndex(idx)
         session.close()
+        
+        # تحديث تسمية المظهر
+        parent = self.parent()
+        while parent and not hasattr(parent, 'dark_mode'):
+            parent = parent.parent()
+        if parent:
+            self.btn_theme_settings.setText("🌙 تفعيل المظهر المضيء" if parent.dark_mode else "☀️ تفعيل المظهر الليلي")
 
     def save_settings(self):
         name = self.input_shop_name.text().strip()
