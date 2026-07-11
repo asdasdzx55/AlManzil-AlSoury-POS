@@ -216,7 +216,7 @@ try {
                     </div>
                     <div class="product-info">
                         <h3 class="product-name"><?php echo htmlspecialchars($prod['name']); ?></h3>
-                        <p class="product-price"><?php echo number_format($prod['price'], 2); ?> ل.س</p>
+                        <p class="product-price"><?php echo number_format($prod['price'], 2); ?> ج.م</p>
                         
                         <?php if ($prod['quantity'] > 0): ?>
                             <button class="btn-add-cart" onclick="alert('تمت إضافة المنتج للسلة')">إضافة للسلة</button>

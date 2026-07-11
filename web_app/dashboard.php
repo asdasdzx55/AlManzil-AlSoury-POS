@@ -204,7 +204,7 @@ $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
     <div class="stats-grid">
         <div class="stat-card sales">
             <h3>إجمالي المبيعات المحققة</h3>
-            <p><?php echo number_format($total_sales, 2); ?> ل.س</p>
+            <p><?php echo number_format($total_sales, 2); ?> ج.م</p>
         </div>
         <div class="stat-card">
             <h3>إجمالي الأصناف المتاحة</h3>
@@ -238,7 +238,7 @@ $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
                                     <?php endif; ?>
                                 </td>
                                 <td><?php echo htmlspecialchars($prod['name']); ?></td>
-                                <td><?php echo number_format($prod['price'], 2); ?> ل.س</td>
+                                <td><?php echo number_format($prod['price'], 2); ?> ج.م</td>
                                 <td><?php echo $prod['quantity']; ?></td>
                                 <td>
                                     <form class="form-inline" method="POST" enctype="multipart/form-data" action="dashboard.php">
@@ -286,7 +286,7 @@ $products = $pdo->query("SELECT * FROM products ORDER BY id DESC")->fetchAll();
                     <tbody>
                         <?php foreach ($recent_sales as $sale): ?>
                             <tr>
-                                <td><?php echo number_format($sale['total_amount'], 2); ?> ل.س</td>
+                                <td><?php echo number_format($sale['total_amount'], 2); ?> ج.م</td>
                                 <td style="font-size: 11px; color:#7f8c8d;"><?php echo $sale['sale_date']; ?></td>
                             </tr>
                         <?php endforeach; ?>

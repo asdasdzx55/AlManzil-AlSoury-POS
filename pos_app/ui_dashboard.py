@@ -261,7 +261,7 @@ class RecallDialog(QDialog):
         self.list_widget = QListWidget()
         for i, inv in enumerate(self.invoices):
             cust_name = inv['customer_name'] if inv['customer_name'] else "عميل سفري"
-            desc = f"فاتورة معلقة #{i+1} | العميل: {cust_name} | الإجمالي: {inv['total']:.2f} ل.س | الأصناف: {len(inv['cart'])}"
+            desc = f"فاتورة معلقة #{i+1} | العميل: {cust_name} | الإجمالي: {inv['total']:.2f} ج.م | الأصناف: {len(inv['cart'])}"
             item = QListWidgetItem(desc)
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.list_widget.addItem(item)
@@ -418,7 +418,7 @@ class POSPage(QWidget):
         summary_layout.setContentsMargins(8, 6, 8, 6)
         summary_layout.setSpacing(4)
         
-        self.total_label = QLabel("صافي القيمة: 0.00 ل.س")
+        self.total_label = QLabel("صافي القيمة: 0.00 ج.م")
         self.total_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #2ecc71;")
         
         form_layout = QFormLayout()
@@ -429,7 +429,7 @@ class POSPage(QWidget):
         self.input_paid.setStyleSheet("font-size: 14px; font-weight: bold; padding: 4px;")
         self.input_paid.textChanged.connect(self.calculate_change)
         
-        self.lbl_change = QLabel("0.00 ل.س")
+        self.lbl_change = QLabel("0.00 ج.م")
         self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
         
         form_layout.addRow("المدفوع:", self.input_paid)
@@ -590,7 +590,7 @@ class POSPage(QWidget):
             self.table.setItem(row, 4, q_weight)
             self.table.setItem(row, 5, s_item)
             
-        self.total_label.setText(f"صافي القيمة: {total:.2f} ل.س")
+        self.total_label.setText(f"صافي القيمة: {total:.2f} ج.م")
         self.calculate_change()
         self.table.blockSignals(False)
 
@@ -598,16 +598,16 @@ class POSPage(QWidget):
         total = sum(item['price'] * item['qty'] for item in self.cart.values())
         paid_text = self.input_paid.text().strip()
         if not paid_text:
-            self.lbl_change.setText("0.00 ل.س")
+            self.lbl_change.setText("0.00 ج.م")
             return
         try:
             paid = float(paid_text)
             change = paid - total
             if change < 0:
-                self.lbl_change.setText(f"متبقٍ عليه: {-change:.2f} ل.س")
+                self.lbl_change.setText(f"متبقٍ عليه: {-change:.2f} ج.م")
                 self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #e74c3c;")
             else:
-                self.lbl_change.setText(f"{change:.2f} ل.س")
+                self.lbl_change.setText(f"{change:.2f} ج.م")
                 self.lbl_change.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71;")
         except ValueError:
             self.lbl_change.setText("خطأ في القيمة")
@@ -806,7 +806,7 @@ class POSPage(QWidget):
             try:
                 new_price = float(self.table.item(row, column).text())
                 if db_product and new_price < db_product.price:
-                    QMessageBox.warning(self, "تنبيه", f"لا يمكن بيع المنتج بسعر أقل من سعر البيع الأساسي ({db_product.price:.2f} ل.س)")
+                    QMessageBox.warning(self, "تنبيه", f"لا يمكن بيع المنتج بسعر أقل من سعر البيع الأساسي ({db_product.price:.2f} ج.م)")
                     new_price = db_product.price
                 target_item['price'] = new_price
             except ValueError:
@@ -866,7 +866,7 @@ class POSPage(QWidget):
 
     def update_total_amount(self):
         total = sum(item['price'] * item['qty'] for item in self.cart.values())
-        self.total_label.setText(f"الإجمالي: {total:.2f} ل.س")
+        self.total_label.setText(f"الإجمالي: {total:.2f} ج.م")
 
     def hold_invoice(self):
         if not self.cart:
@@ -982,7 +982,7 @@ class POSPage(QWidget):
             self.cust_phone.clear()
             self.cust_address.clear()
             self.input_paid.clear()
-            self.lbl_change.setText("0.00 ل.س")
+            self.lbl_change.setText("0.00 ج.م")
             self.lbl_avail_box.setText("-")
             self.lbl_avail_unit.setText("-")
             self.load_delivery_employees()
@@ -1515,7 +1515,7 @@ class PurchasesPage(QWidget):
         self.combo_supplier.currentIndexChanged.connect(self.on_supplier_changed)
         
         # صندوق عرض الرصيد قبل الفاتورة
-        self.lbl_supplier_balance = QLabel("الرصيد المستحق قبل الفاتورة: 0.00 ل.س")
+        self.lbl_supplier_balance = QLabel("الرصيد المستحق قبل الفاتورة: 0.00 ج.م")
         self.lbl_supplier_balance.setStyleSheet("font-weight: bold; color: #e74c3c;")
         
         sup_layout.addWidget(self.combo_supplier)
@@ -1531,7 +1531,7 @@ class PurchasesPage(QWidget):
         # مجموعة الإجمالي والحفظ
         sum_group = QGroupBox("ملخص الشراء")
         sum_layout = QVBoxLayout(sum_group)
-        self.total_label = QLabel("إجمالي الفاتورة: 0.00 ل.س")
+        self.total_label = QLabel("إجمالي الفاتورة: 0.00 ج.م")
         self.total_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #2ecc71;")
         
         btn_save = QPushButton("💾 حفظ وتأكيد فاتورة الشراء (F5)")
@@ -1575,13 +1575,13 @@ class PurchasesPage(QWidget):
     def on_supplier_changed(self):
         supplier_id = self.combo_supplier.currentData()
         if not supplier_id:
-            self.lbl_supplier_balance.setText("الرصيد المستحق قبل الفاتورة: 0.00 ل.س")
+            self.lbl_supplier_balance.setText("الرصيد المستحق قبل الفاتورة: 0.00 ج.م")
             return
             
         session = get_session()
         sup = session.query(Supplier).get(supplier_id)
         if sup:
-            self.lbl_supplier_balance.setText(f"الرصيد المستحق قبل الفاتورة: {sup.balance:.2f} ل.س")
+            self.lbl_supplier_balance.setText(f"الرصيد المستحق قبل الفاتورة: {sup.balance:.2f} ج.م")
         session.close()
 
     def open_search_dialog(self):
@@ -1676,7 +1676,7 @@ class PurchasesPage(QWidget):
             self.table.setItem(row, 4, bon_item)
             self.table.setItem(row, 5, s_item)
             
-        self.total_label.setText(f"إجمالي الفاتورة: {total:.2f} ل.س")
+        self.total_label.setText(f"إجمالي الفاتورة: {total:.2f} ج.م")
         self.table.blockSignals(False)
 
     def on_cell_changed(self, row, column):
@@ -2689,23 +2689,23 @@ class ReportsPage(QWidget):
         
         cards_layout = QHBoxLayout()
         
-        self.card_sales = QLabel("إجمالي المبيعات\n0.00 ل.س")
+        self.card_sales = QLabel("إجمالي المبيعات\n0.00 ج.م")
         self.card_sales.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.card_sales.setStyleSheet("background-color: #10b981; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
         
-        self.card_purchases = QLabel("إجمالي المشتريات\n0.00 ل.س")
+        self.card_purchases = QLabel("إجمالي المشتريات\n0.00 ج.م")
         self.card_purchases.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.card_purchases.setStyleSheet("background-color: #3b82f6; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
         
-        self.card_expenses = QLabel("إجمالي المصاريف\n0.00 ل.س")
+        self.card_expenses = QLabel("إجمالي المصاريف\n0.00 ج.م")
         self.card_expenses.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.card_expenses.setStyleSheet("background-color: #ef4444; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
         
-        self.card_salaries = QLabel("رواتب الموظفين\n0.00 ل.س")
+        self.card_salaries = QLabel("رواتب الموظفين\n0.00 ج.م")
         self.card_salaries.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.card_salaries.setStyleSheet("background-color: #f59e0b; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
         
-        self.card_profits = QLabel("الأرباح الصافية\n0.00 ل.س")
+        self.card_profits = QLabel("الأرباح الصافية\n0.00 ج.م")
         self.card_profits.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.card_profits.setStyleSheet("background-color: #8b5cf6; color: white; font-size: 15px; font-weight: bold; padding: 15px; border-radius: 8px;")
         
@@ -2842,11 +2842,11 @@ class ReportsPage(QWidget):
             
         net_profits = total_sales - total_cost_of_goods - total_expenses - total_salaries
         
-        self.card_sales.setText(f"إجمالي المبيعات\n{total_sales:.2f} ل.س")
-        self.card_purchases.setText(f"إجمالي المشتريات\n{total_purchases:.2f} ل.س")
-        self.card_expenses.setText(f"إجمالي المصاريف\n{total_expenses:.2f} ل.س")
-        self.card_salaries.setText(f"رواتب الموظفين\n{total_salaries:.2f} ل.س")
-        self.card_profits.setText(f"الأرباح الصافية\n{net_profits:.2f} ل.س")
+        self.card_sales.setText(f"إجمالي المبيعات\n{total_sales:.2f} ج.م")
+        self.card_purchases.setText(f"إجمالي المشتريات\n{total_purchases:.2f} ج.م")
+        self.card_expenses.setText(f"إجمالي المصاريف\n{total_expenses:.2f} ج.م")
+        self.card_salaries.setText(f"رواتب الموظفين\n{total_salaries:.2f} ج.م")
+        self.card_profits.setText(f"الأرباح الصافية\n{net_profits:.2f} ج.م")
         
         self.chart.set_data(total_sales, total_purchases, total_expenses, total_salaries, net_profits)
         
@@ -2924,12 +2924,12 @@ class ReportsPage(QWidget):
                 net_profits = total_sales - total_cost_of_goods - total_expenses - total_salaries
                 
                 writer.writerow(["--- ملخص الميزانية والأرباح ---"])
-                writer.writerow(["إجمالي المبيعات", f"{total_sales:.2f} ل.س"])
-                writer.writerow(["إجمالي تكلفة المبيعات", f"{total_cost_of_goods:.2f} ل.س"])
-                writer.writerow(["إجمالي مشتريات البضاعة", f"{total_purchases:.2f} ل.س"])
-                writer.writerow(["إجمالي المصاريف والتشغيل", f"{total_expenses:.2f} ل.س"])
-                writer.writerow(["رواتب الموظفين", f"{total_salaries:.2f} ل.س"])
-                writer.writerow(["الأرباح الصافية (Net Profit)", f"{net_profits:.2f} ل.س"])
+                writer.writerow(["إجمالي المبيعات", f"{total_sales:.2f} ج.م"])
+                writer.writerow(["إجمالي تكلفة المبيعات", f"{total_cost_of_goods:.2f} ج.م"])
+                writer.writerow(["إجمالي مشتريات البضاعة", f"{total_purchases:.2f} ج.م"])
+                writer.writerow(["إجمالي المصاريف والتشغيل", f"{total_expenses:.2f} ج.م"])
+                writer.writerow(["رواتب الموظفين", f"{total_salaries:.2f} ج.م"])
+                writer.writerow(["الأرباح الصافية (Net Profit)", f"{net_profits:.2f} ج.م"])
                 writer.writerow([])
                 
                 writer.writerow(["--- سجل الفواتير والمبيعات ---"])
@@ -3389,7 +3389,7 @@ class ReturnsPage(QWidget):
         layout.addWidget(self.table)
         
         bottom_bar = QHBoxLayout()
-        self.lbl_refund = QLabel("إجمالي المبلغ المسترجع: 0.00 ل.س")
+        self.lbl_refund = QLabel("إجمالي المبلغ المسترجع: 0.00 ج.م")
         self.lbl_refund.setStyleSheet("font-size: 18px; font-weight: bold; color: #c0392b;")
         
         btn_confirm = QPushButton("تأكيد المرتجع وإرجاع المال 🔄")
@@ -3515,7 +3515,7 @@ class ReturnsPage(QWidget):
 
     def calculate_total(self):
         total = sum(item['price'] * item['qty_to_return'] for item in self.return_items.values())
-        self.lbl_refund.setText(f"إجمالي المبلغ المسترجع: {total:.2f} ل.س")
+        self.lbl_refund.setText(f"إجمالي المبلغ المسترجع: {total:.2f} ج.م")
 
     def confirm_return(self):
         if not self.return_items:
@@ -3783,7 +3783,7 @@ class SettingsPage(QWidget):
             
             # حساب إجمالي المسحوبات للشريك
             tot_w = sum(w.amount for w in p.withdrawals)
-            self.table_partners.setItem(row, 3, QTableWidgetItem(f"{tot_w:.2f} ل.س"))
+            self.table_partners.setItem(row, 3, QTableWidgetItem(f"{tot_w:.2f} ج.م"))
             
         session.close()
 
