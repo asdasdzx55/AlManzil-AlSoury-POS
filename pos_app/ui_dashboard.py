@@ -16,83 +16,82 @@ class DashboardWindow(QWidget):
         self.dark_mode = True # المظهر الافتراضي هو الليلي
         self.init_ui()
 
-    def init_ui(self):
-        # Layout الرئيسي (شريط جانبي يمين، والصفحات على اليسار مع استجابة للشاشة)
+         # Layout الرئيسي (شريط جانبي يمين، والصفحات على اليسار مع استجابة للشاشة)
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # 1. شريط القوائم الجانبي
+        # 1. شريط القوائم الجانبي (العريض لتوافق Luxe POS)
         self.sidebar = QWidget()
         self.sidebar.setObjectName("sidebar")
-        self.sidebar.setFixedWidth(75)
+        self.sidebar.setFixedWidth(210)
         
         sidebar_layout = QVBoxLayout(self.sidebar)
-        sidebar_layout.setContentsMargins(0, 20, 0, 20)
-        sidebar_layout.setSpacing(15)
+        sidebar_layout.setContentsMargins(10, 20, 10, 20)
+        sidebar_layout.setSpacing(8)
         
         # شعار المحل
-        shop_title = QLabel("🏡")
+        shop_title = QLabel("🏡  المنزل السوري")
         shop_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        shop_title.setStyleSheet("font-size: 32px; margin-bottom: 20px;")
+        shop_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #fbbf24; margin-bottom: 15px;")
         shop_title.setToolTip(f"المنزل السوري - المستخدم: {self.user.username} ({self.user.role})")
         sidebar_layout.addWidget(shop_title)
         
-        # أزرار شريط التنقل
-        self.btn_pos = QPushButton("🛒")
+        # أزرار شريط التنقل مع النصوص والأيقونات
+        self.btn_pos = QPushButton("🛒   المبيعات (POS)")
         self.btn_pos.setToolTip("نقطة البيع (الكاشير)")
         self.btn_pos.setCheckable(True)
         self.btn_pos.setChecked(True)
         self.btn_pos.clicked.connect(lambda: self.switch_page(0))
         sidebar_layout.addWidget(self.btn_pos)
         
-        self.btn_returns = QPushButton("↩️")
+        self.btn_returns = QPushButton("↩️   مرتجع المبيعات")
         self.btn_returns.setToolTip("مرتجع المبيعات")
         self.btn_returns.setCheckable(True)
         self.btn_returns.clicked.connect(lambda: self.switch_page(1))
         sidebar_layout.addWidget(self.btn_returns)
         
-        self.btn_purchases = QPushButton("📥")
+        self.btn_purchases = QPushButton("📥   المشتريات والتوريد")
         self.btn_purchases.setToolTip("فاتورة المشتريات والتوريد")
         self.btn_purchases.setCheckable(True)
         self.btn_purchases.clicked.connect(lambda: self.switch_page(2))
         sidebar_layout.addWidget(self.btn_purchases)
         
-        self.btn_inventory = QPushButton("📦")
+        self.btn_inventory = QPushButton("📦   إدارة الأصناف")
         self.btn_inventory.setToolTip("إدارة الأصناف")
         self.btn_inventory.setCheckable(True)
         self.btn_inventory.clicked.connect(lambda: self.switch_page(3))
         sidebar_layout.addWidget(self.btn_inventory)
         
-        self.btn_suppliers = QPushButton("👥")
+        self.btn_suppliers = QPushButton("👥   إدارة الموردين")
         self.btn_suppliers.setToolTip("إدارة الموردين")
         self.btn_suppliers.setCheckable(True)
         self.btn_suppliers.clicked.connect(lambda: self.switch_page(4))
         sidebar_layout.addWidget(self.btn_suppliers)
         
-        self.btn_hr = QPushButton("👤")
+        self.btn_hr = QPushButton("👤   الموارد البشرية")
         self.btn_hr.setToolTip("إدارة شؤون الموظفين والرواتب (HR)")
         self.btn_hr.setCheckable(True)
         self.btn_hr.clicked.connect(lambda: self.switch_page(5))
         sidebar_layout.addWidget(self.btn_hr)
         
-        self.btn_reports = QPushButton("📈")
+        self.btn_reports = QPushButton("📈   التقارير والمبيعات")
         self.btn_reports.setToolTip("التقارير والمبيعات")
         self.btn_reports.setCheckable(True)
         if self.user.role != 'admin':
             self.btn_reports.setEnabled(False)
             self.btn_reports.setToolTip("هذه الصفحة متاحة للمدير فقط")
-            self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 24px;")
+            self.btn_reports.setStyleSheet("color: #7f8c8d; font-size: 13px; text-align: right;")
         self.btn_reports.clicked.connect(lambda: self.switch_page(6))
         sidebar_layout.addWidget(self.btn_reports)
         
-        self.btn_sync = QPushButton("🔄")
+        self.btn_sync = QPushButton("🔄   المزامنة السحابية")
         self.btn_sync.setToolTip("المزامنة السحابية")
         self.btn_sync.setCheckable(True)
         self.btn_sync.clicked.connect(lambda: self.switch_page(7))
         sidebar_layout.addWidget(self.btn_sync)
         
-        self.btn_settings = QPushButton("⚙️")
+        self.btn_settings = QPushButton("⚙️   إعدادات النظام")
         self.btn_settings.setToolTip("الإعدادات والشركاء")
         self.btn_settings.setCheckable(True)
         self.btn_settings.clicked.connect(lambda: self.switch_page(8))
@@ -101,7 +100,7 @@ class DashboardWindow(QWidget):
         sidebar_layout.addStretch()
         
         # زر تسجيل الخروج
-        btn_logout = QPushButton("🚪")
+        btn_logout = QPushButton("🚪   تسجيل الخروج")
         btn_logout.setToolTip("تسجيل الخروج")
         btn_logout.setObjectName("dangerButton")
         btn_logout.clicked.connect(self.on_logout)
@@ -111,7 +110,7 @@ class DashboardWindow(QWidget):
         
         # 2. حاوي الصفحات الرئيسي (مستجيب وقابل للتمدد)
         self.container = QStackedWidget()
-        self.container.setStyleSheet("padding: 15px;")
+        self.container.setStyleSheet("padding: 10px;")
         
         self.page_pos = POSPage(self.user)
         self.page_returns = ReturnsPage()
@@ -133,17 +132,59 @@ class DashboardWindow(QWidget):
         self.container.addWidget(self.page_sync)
         self.container.addWidget(self.page_settings)
         
+        # 3. شريط الرأس العلوي (TopNavBar) لتجربة الويب الاحترافية
+        self.header_bar = QWidget()
+        self.header_bar.setFixedHeight(65)
+        self.header_bar.setStyleSheet("background-color: #111c2d; border-bottom: 1px solid #4f4633;")
+        header_layout = QHBoxLayout(self.header_bar)
+        header_layout.setContentsMargins(20, 0, 20, 0)
+        
+        self.lbl_page_title = QLabel("🛒   نقطة البيع (الكاشير)")
+        self.lbl_page_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffe1a7;")
+        
+        import datetime
+        today_str = datetime.date.today().strftime('%Y-%m-%d')
+        self.lbl_user_info = QLabel(f"👤 {self.user.username} ({self.user.role})   |   📅 {today_str}")
+        self.lbl_user_info.setStyleSheet("font-size: 13px; color: #d8e3fb; font-weight: bold;")
+        
+        header_layout.addWidget(self.lbl_page_title)
+        header_layout.addStretch()
+        header_layout.addWidget(self.lbl_user_info)
+        
+        # تجميع الجزء الأيسر (الرأس + الصفحات المكدسة)
+        left_area = QWidget()
+        left_layout = QVBoxLayout(left_area)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        left_layout.addWidget(self.header_bar)
+        left_layout.addWidget(self.container, 1)
+        
         # ترتيب العناصر في Layout الرئيسي
-        main_layout.addWidget(self.container, 1) # المحتوى يأخذ المساحة المتبقية
-        main_layout.addWidget(self.sidebar)       # الشريط الجانبي في اليمين (نظام عربي)
+        main_layout.addWidget(left_area, 1)        # المحتوى يأخذ المساحة المتبقية
+        main_layout.addWidget(self.sidebar)         # الشريط الجانبي في اليمين (نظام عربي)
         
         self.setLayout(main_layout)
-
+ 
     def switch_page(self, index):
         for i, btn in enumerate(self.menu_buttons):
             btn.setChecked(i == index)
         self.container.setCurrentIndex(index)
         
+        # تحديث عنوان الرأس العلوي تلقائياً عند تغيير الصفحة
+        titles = [
+            "🛒   نقطة البيع (الكاشير)",
+            "↩️   مرتجع المبيعات",
+            "📥   المشتريات والتوريد",
+            "📦   إدارة الأصناف والمخازن",
+            "👥   إدارة الموردين والحسابات",
+            "👤   إدارة شؤون الموظفين والرواتب",
+            "📈   التقارير المالية والتحليلات",
+            "🔄   المزامنة السحابية",
+            "⚙️   إعدادات النظام والشركاء"
+        ]
+        if index < len(titles):
+            self.lbl_page_title.setText(titles[index])
+            
         if index == 0:
             self.page_pos.load_delivery_employees()
         elif index == 1:
