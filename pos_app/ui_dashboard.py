@@ -135,17 +135,19 @@ class DashboardWindow(QWidget):
         # 3. شريط الرأس العلوي (TopNavBar) لتجربة الويب الاحترافية
         self.header_bar = QWidget()
         self.header_bar.setFixedHeight(65)
-        self.header_bar.setStyleSheet("background-color: #111c2d; border-bottom: 1px solid #4f4633;")
+        self.header_bar.setObjectName("headerBar")
         header_layout = QHBoxLayout(self.header_bar)
         header_layout.setContentsMargins(20, 0, 20, 0)
         
         self.lbl_page_title = QLabel("🛒   نقطة البيع (الكاشير)")
-        self.lbl_page_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffe1a7;")
+        self.lbl_page_title.setObjectName("headerTitle")
+        self.lbl_page_title.setStyleSheet("font-size: 18px; font-weight: bold;")
         
         import datetime
         today_str = datetime.date.today().strftime('%Y-%m-%d')
         self.lbl_user_info = QLabel(f"👤 {self.user.username} ({self.user.role})   |   📅 {today_str}")
-        self.lbl_user_info.setStyleSheet("font-size: 13px; color: #d8e3fb; font-weight: bold;")
+        self.lbl_user_info.setObjectName("headerUserInfo")
+        self.lbl_user_info.setStyleSheet("font-size: 13px; font-weight: bold;")
         
         header_layout.addWidget(self.lbl_page_title)
         header_layout.addStretch()

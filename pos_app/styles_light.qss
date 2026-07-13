@@ -96,6 +96,7 @@ QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QDateEdit {
     border-radius: 8px;
     padding: 8px 12px;
     color: #1e293b;
+    placeholder-text-color: #64748b;
 }
 
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {
@@ -201,4 +202,18 @@ QLabel#loginTitle {
     color: #fbbf24;
     font-size: 24px;
     font-weight: bold;
+}
+
+/* Header Bar Styling */
+QWidget#headerBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+QLabel#headerTitle {
+    color: #1e293b;
+}
+
+QLabel#headerUserInfo {
+    color: #475569;
 }
