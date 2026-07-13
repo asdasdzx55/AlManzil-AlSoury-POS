@@ -14,12 +14,17 @@ QWidget {
 /* Sidebar Specifics */
 QWidget#sidebar {
     background-color: #111c2d;
-    border-left: 1px solid #4f4633;
+    border-left: 1px solid #1f2a3c;
 }
 
 QWidget#sidebar QLabel {
-    margin-bottom: 25px;
-    font-size: 36px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #fbbf24;
+    margin-top: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1f2a3c;
 }
 
 QWidget#sidebar QPushButton {
@@ -27,20 +32,23 @@ QWidget#sidebar QPushButton {
     color: #d3c5ac;
     border: none;
     border-radius: 8px;
-    padding: 14px 5px;
-    margin: 4px 8px;
-    font-size: 26px;
+    padding: 10px 16px;
+    margin: 2px 8px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: right;
 }
 
 QWidget#sidebar QPushButton:hover {
     background-color: #1f2a3c;
-    color: #d8e3fb;
+    color: #ffffff;
 }
 
 QWidget#sidebar QPushButton:checked {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fbbf24, stop:1 #f9bd22);
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fbbf24, stop:1 #f59e0b);
     color: #402d00;
     border: none;
+    border-left: 4px solid #ffffff;
 }
 
 /* General Buttons */
