@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Premium State-of-the-Art Light Theme for AlManzil AlSoury POS
-   Designed with sleek white/gray, soft borders, and beautiful sky-blue accents
+   Luxe POS Premium Light Theme
+   Based on modern corporate efficiency and minimalist luxury design system
    ========================================================================== */
 
 /* Main Widget Background */
@@ -8,13 +8,13 @@ QWidget {
     background-color: #f8fafc;
     font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
     font-size: 13px;
-    color: #334155;
+    color: #1e293b;
 }
 
 /* Sidebar Specifics */
 QWidget#sidebar {
     background-color: #ffffff;
-    border-left: 2px solid #e2e8f0;
+    border-left: 1px solid #cbd5e1;
 }
 
 QWidget#sidebar QLabel {
@@ -26,7 +26,7 @@ QWidget#sidebar QPushButton {
     background-color: transparent;
     color: #64748b;
     border: none;
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 14px 5px;
     margin: 4px 8px;
     font-size: 26px;
@@ -38,17 +38,17 @@ QWidget#sidebar QPushButton:hover {
 }
 
 QWidget#sidebar QPushButton:checked {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #bae6fd, stop:1 #38bdf8);
-    color: #0369a1;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fbbf24, stop:1 #f9bd22);
+    color: #402d00;
     border: none;
 }
 
 /* General Buttons */
 QPushButton {
     background-color: #ffffff;
-    color: #475569;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
     padding: 8px 16px;
     font-weight: bold;
     font-size: 13px;
@@ -56,62 +56,61 @@ QPushButton {
 
 QPushButton:hover {
     background-color: #f1f5f9;
-    border-color: #cbd5e1;
+    border-color: #94a3b8;
     color: #0f172a;
 }
 
 QPushButton:pressed {
-    background-color: #cbd5e1;
+    background-color: #e2e8f0;
 }
 
-/* Primary / Pay Buttons */
+/* Primary / Pay Buttons (Gold Accent) */
 QPushButton[styleSheetClass="primary"], QPushButton#btn_pay {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669);
-    color: #ffffff;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #fbbf24, stop:1 #f9bd22);
+    color: #402d00;
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     font-weight: bold;
 }
 
 QPushButton[styleSheetClass="primary"]:hover {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #047857);
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffe1a7, stop:1 #fbbf24);
 }
 
-/* Danger / Clear Buttons */
+/* Danger / Clear Buttons (Red Accent) */
 QPushButton#dangerButton {
     background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #f43f5e, stop:1 #e11d48);
     color: #ffffff;
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
 }
 
 QPushButton#dangerButton:hover {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #e11d48, stop:1 #be123c);
+    background-color: #be123c;
 }
 
 /* Input Fields & Combos */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QDateEdit {
-    background-color: #f1f5f9;
+    background-color: #ffffff;
     border: 1px solid #cbd5e1;
-    border-radius: 10px;
+    border-radius: 8px;
     padding: 8px 12px;
-    color: #0f172a;
-    placeholder-text-color: #64748b;
+    color: #1e293b;
 }
 
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QDateEdit:focus {
-    border: 2px solid #0ea5e9;
+    border: 2px solid #fbbf24;
     background-color: #ffffff;
 }
 
 /* Group Boxes / Cards */
 QGroupBox {
     border: 1px solid #e2e8f0;
-    border-radius: 14px;
+    border-radius: 12px;
     margin-top: 12px;
     font-weight: bold;
     font-size: 13px;
-    color: #0284c7;
+    color: #fbbf24;
     background-color: #ffffff;
     padding: 15px 10px 10px 10px;
 }
@@ -127,8 +126,8 @@ QGroupBox::title {
 
 /* Special Stock Availability Cards */
 QGroupBox#stockGroup {
-    background-color: #e0f2fe; /* light sky blue background */
-    border: 1px solid #bae6fd;
+    background-color: #ffffff;
+    border: 1px solid #94a3b8;
 }
 
 QGroupBox#stockGroup QLabel {
@@ -138,7 +137,7 @@ QGroupBox#stockGroup QLabel {
 /* Tables styling */
 QTableWidget {
     background-color: #ffffff;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     gridline-color: #cbd5e1;
     color: #1e293b;
@@ -146,10 +145,10 @@ QTableWidget {
 
 QHeaderView::section {
     background-color: #f8fafc;
-    padding: 4px 6px;
+    padding: 8px;
     border: 1px solid #cbd5e1;
     font-weight: bold;
-    color: #1e293b;
+    color: #475569;
 }
 
 QTableWidget::item {
@@ -161,8 +160,8 @@ QTableWidget::item:alternate {
 }
 
 QTableWidget::item:selected {
-    background-color: #38bdf8;
-    color: #ffffff;
+    background-color: #fbbf24;
+    color: #402d00;
 }
 
 /* Tab Widgets */
@@ -186,20 +185,20 @@ QTabBar::tab {
 
 QTabBar::tab:selected {
     background-color: #ffffff;
-    color: #0ea5e9;
-    border-bottom: 3px solid #0ea5e9;
+    color: #fbbf24;
+    border-bottom: 3px solid #fbbf24;
 }
 
 /* Login Window Container */
 QWidget#loginBox {
     background-color: #ffffff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #cbd5e1;
     border-radius: 16px;
     padding: 30px;
 }
 
 QLabel#loginTitle {
-    color: #0ea5e9;
+    color: #fbbf24;
     font-size: 24px;
     font-weight: bold;
 }
