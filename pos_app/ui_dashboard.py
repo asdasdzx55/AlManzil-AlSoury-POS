@@ -16,6 +16,7 @@ class DashboardWindow(QWidget):
         self.dark_mode = True # المظهر الافتراضي هو الليلي
         self.init_ui()
 
+    def init_ui(self):
          # Layout الرئيسي (شريط جانبي يمين، والصفحات على اليسار مع استجابة للشاشة)
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
